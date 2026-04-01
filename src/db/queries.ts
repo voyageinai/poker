@@ -239,8 +239,9 @@ export function getPlayerStats(userId: string): PlayerStats {
       SUM(CASE WHEN result = 'won' THEN 1 ELSE 0 END) as win_count,
       SUM(CASE WHEN result = 'lost' THEN 1 ELSE 0 END) as loss_count,
       SUM(COALESCE(stack_end, 0) - stack_start) as total_profit
-    FROM hand_players
-    WHERE user_id = ?
+    FROM hand_players hp
+    JOIN poker_hands h ON hp.hand_id = h.id
+    WHERE hp.user_id = ? AND h.status = 'complete'
   `).get(userId) as { total_hands: number; win_count: number; loss_count: number; total_profit: number } | undefined;
   return row ?? { total_hands: 0, win_count: 0, loss_count: 0, total_profit: 0 };
 }

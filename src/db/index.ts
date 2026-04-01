@@ -5,7 +5,9 @@ import { ensureSystemBots } from './system-bots';
 
 export const TOTAL_SUPPLY = 21_000_000;
 
-const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'poker.db');
+function resolveDbPath(): string {
+  return process.env.DB_PATH || path.join(process.cwd(), 'poker.db');
+}
 
 // Use globalThis to share across Next.js webpack bundles and tsx runtime
 const G = globalThis as Record<string, unknown>;
@@ -85,7 +87,7 @@ function initTreasury(db: Database.Database): void {
 
 export function getDb(): Database.Database {
   if (!G.__pokerDb) {
-    const dbPath = process.env.DB_PATH || DB_PATH;
+    const dbPath = resolveDbPath();
     const db = new Database(dbPath);
     runMigrations(db);  // migrate BEFORE schema so new indexes can reference new columns
     db.exec(SCHEMA);
