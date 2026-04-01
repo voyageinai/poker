@@ -271,6 +271,49 @@ export function getHandsByTable(tableId: string, limit = 20): DbHand[] {
   ).all(tableId, limit) as DbHand[];
 }
 
+// ─── User hand history ───────────────────────────────────────────────────────
+
+export interface UserHandRow {
+  id: string;
+  hand_number: number;
+  table_name: string;
+  pot: number;
+  ended_at: number;
+  hole_cards: string | null;
+  result: string | null;
+  stack_start: number;
+  stack_end: number | null;
+  amount_won: number;
+}
+
+export function getHandsByUserId(userId: string, params: { page?: number; pageSize?: number }): { rows: UserHandRow[]; total: number } {
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 30));
+  const offset = (page - 1) * pageSize;
+
+  const db = getDb();
+
+  const total = (db.prepare(`
+    SELECT COUNT(*) as n
+    FROM hand_players hp
+    JOIN poker_hands h ON hp.hand_id = h.id
+    WHERE hp.user_id = ? AND h.status = 'complete'
+  `).get(userId) as { n: number }).n;
+
+  const rows = db.prepare(`
+    SELECT h.id, h.hand_number, t.name AS table_name, h.pot, h.ended_at,
+           hp.hole_cards, hp.result, hp.stack_start, hp.stack_end, hp.amount_won
+    FROM hand_players hp
+    JOIN poker_hands h ON hp.hand_id = h.id
+    JOIN poker_tables t ON h.table_id = t.id
+    WHERE hp.user_id = ? AND h.status = 'complete'
+    ORDER BY h.ended_at DESC
+    LIMIT ? OFFSET ?
+  `).all(userId, pageSize, offset) as UserHandRow[];
+
+  return { rows, total };
+}
+
 export function getHandById(id: string): DbHand | null {
   return getDb().prepare('SELECT * FROM poker_hands WHERE id=?').get(id) as DbHand | null;
 }
