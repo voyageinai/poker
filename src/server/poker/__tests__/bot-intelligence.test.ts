@@ -11,7 +11,7 @@ describe('STYLE_CONFIG intelligence fields', () => {
     expect(styles).toHaveLength(11);
   });
 
-  for (const field of ['positionSensitivity', 'sizingSensitivity', 'patternSensitivity', 'exploitWeight'] as const) {
+  for (const field of ['positionSensitivity', 'sizingSensitivity', 'patternSensitivity', 'exploitWeight', 'preflopCommitCap'] as const) {
     it(`every style has ${field} between 0 and 1`, () => {
       for (const style of styles) {
         const value = (STYLE_CONFIG_FOR_TEST[style] as unknown as Record<string, unknown>)[field];

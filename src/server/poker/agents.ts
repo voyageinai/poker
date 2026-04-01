@@ -264,20 +264,21 @@ interface StyleParams {
   sizingSensitivity: number;
   patternSensitivity: number;
   exploitWeight: number;
+  preflopCommitCap: number;
 }
 
 const STYLE_CONFIG: Record<SystemBotStyle, StyleParams> = {
-  nit:        { label: '司马懿', aggression: 0.28, looseness: 0.18, bluffRate: 0.01, raiseBias: 0.08, crowdSensitivity: 1.0,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3 },
-  tag:        { label: '赵云',   aggression: 0.52, looseness: 0.42, bluffRate: 0.04, raiseBias: 0.18, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.05, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7 },
-  lag:        { label: '孙悟空', aggression: 0.72, looseness: 0.65, bluffRate: 0.08, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0,    checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.7 },
-  station:    { label: '猪八戒', aggression: 0.16, looseness: 0.72, bluffRate: 0,    raiseBias: 0.04, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1 },
-  maniac:     { label: '张飞',   aggression: 0.88, looseness: 0.82, bluffRate: 0.18, raiseBias: 0.45, crowdSensitivity: 0.2,  slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.1, exploitWeight: 0.3 },
-  trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.45, bluffRate: 0.03, raiseBias: 0.12, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6 },
-  bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5 },
-  tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5 },
-  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.40, bluffRate: 0.05, raiseBias: 0.20, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4 },
-  adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0 },
-  gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2 },
+  nit:        { label: '司马懿', aggression: 0.28, looseness: 0.18, bluffRate: 0.01, raiseBias: 0.08, crowdSensitivity: 1.0,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3, preflopCommitCap: 0.25 },
+  tag:        { label: '赵云',   aggression: 0.52, looseness: 0.42, bluffRate: 0.04, raiseBias: 0.18, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.05, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7, preflopCommitCap: 0.25 },
+  lag:        { label: '孙悟空', aggression: 0.72, looseness: 0.65, bluffRate: 0.08, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0,    checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.7, preflopCommitCap: 0.35 },
+  station:    { label: '猪八戒', aggression: 0.16, looseness: 0.72, bluffRate: 0,    raiseBias: 0.04, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1, preflopCommitCap: 0.25 },
+  maniac:     { label: '张飞',   aggression: 0.88, looseness: 0.82, bluffRate: 0.18, raiseBias: 0.45, crowdSensitivity: 0.2,  slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.1, exploitWeight: 0.3, preflopCommitCap: 0.50 },
+  trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.45, bluffRate: 0.03, raiseBias: 0.12, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25 },
+  bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5, preflopCommitCap: 0.30 },
+  tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.25 },
+  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.40, bluffRate: 0.05, raiseBias: 0.20, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25 },
+  adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.25 },
+  gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.25 },
 };
 
 // ─── Opponent stats for adaptive bot ──────────────────────────────────────────
@@ -859,6 +860,12 @@ function chooseBuiltinAction(
   const maxRaiseTotal = req.currentBet + req.stack - req.toCall;
   const canRaise = req.stack > req.toCall && minRaiseTotal <= maxRaiseTotal;
 
+  // Dynamic floors: aggressive styles can bluff/raise with weaker hands
+  const bluffFloor = 0.32 - cfg.looseness * 0.22;
+  const raiseBiasFloor = 0.42 - cfg.looseness * 0.15;
+  // Thin value bet floor: allows medium-strength hands to bet for value
+  const valueBetFloor = sizedRaiseThreshold - 0.12 - cfg.aggression * 0.08;
+
   // No bet to face: check or bet
   if (req.toCall === 0) {
     // Low SPR: prefer shoving over slowplaying
@@ -869,7 +876,20 @@ function chooseBuiltinAction(
     if (strength > 0.75 && roll(cfg.slowplayRate)) {
       return { action: 'check' };
     }
-    if (canRaise && (strength > sizedRaiseThreshold || (strength > 0.32 && roll(cfg.bluffRate)))) {
+    if (canRaise && strength > sizedRaiseThreshold) {
+      return chooseRaiseAction(req, strength, cfg);
+    }
+    // Thin value bet: medium-strength hands bet smaller for value
+    if (canRaise && strength > valueBetFloor && strength <= sizedRaiseThreshold) {
+      const thinBetAmount = Math.round(req.pot * (0.40 + strength * 0.25));
+      const raiseTotal = clampInt(
+        req.currentBet + Math.max(thinBetAmount, req.minRaise),
+        minRaiseTotal, maxRaiseTotal,
+      );
+      return raiseTotal >= maxRaiseTotal ? { action: 'allin' } : { action: 'raise', amount: raiseTotal };
+    }
+    // Bluff bet: aggressive styles can bet with air
+    if (canRaise && strength > bluffFloor && roll(cfg.bluffRate)) {
       return chooseRaiseAction(req, strength, cfg);
     }
     return { action: 'check' };
@@ -882,15 +902,15 @@ function chooseBuiltinAction(
   }
 
   if (strength < sizedCallThreshold) {
-    // Below calling threshold — sometimes bluff-raise with decent hands
-    if (canRaise && strength > 0.45 && roll(cfg.bluffRate)) {
+    // Below calling threshold — sometimes bluff-raise
+    if (canRaise && strength > bluffFloor + 0.10 && roll(cfg.bluffRate)) {
       return chooseRaiseAction(req, strength, cfg);
     }
     return { action: 'fold' };
   }
 
   // Above calling threshold — consider raising
-  if (canRaise && (strength > sizedRaiseThreshold || (strength > 0.42 && roll(cfg.raiseBias)))) {
+  if (canRaise && (strength > sizedRaiseThreshold || (strength > raiseBiasFloor && roll(cfg.raiseBias)))) {
     return chooseRaiseAction(req, strength, cfg);
   }
 
@@ -925,15 +945,15 @@ function chooseRaiseAction(
     maxRaiseTotal,
   );
 
-  // Preflop sizing cap: non-premium hands shouldn't commit >25% of initial stack
+  // Preflop sizing cap: non-premium hands shouldn't over-commit
   // Premium hands (strength > 0.75) are exempt — they can go big
+  // Cap varies by style: maniac 50%, lag 35%, others 25%
   if (req.street === 'preflop' && strength < 0.75) {
     const rInitStack = req.initialStack ?? req.stack;
-    const maxPreflop = Math.round(rInitStack * 0.25);
+    const maxPreflop = Math.round(rInitStack * cfg.preflopCommitCap);
     const chipsInPot = rInitStack - req.stack;
     const wouldCommit = chipsInPot + (raiseTotal - req.currentBet + req.toCall);
     if (wouldCommit > maxPreflop) {
-      // Cap the raise so total commitment stays under 25%
       const capped = req.currentBet + Math.max(maxPreflop - chipsInPot - req.toCall, req.minRaise);
       raiseTotal = clampInt(capped, minRaiseTotal, maxRaiseTotal);
     }
@@ -1004,12 +1024,19 @@ function chooseGtoAction(
 
   if (req.toCall === 0) {
     // No bet to face: choose between check and bet
-    // Bet with strong hands (value) and some weak hands (bluff) at ~2:1 ratio
-    const valueBetThreshold = 0.65;
-    const bluffThreshold = 0.25;  // bottom of range for bluffs
-    const betFreq = strength > valueBetThreshold ? 0.80
-      : (strength < bluffThreshold && strength > 0.10) ? 0.25
-      : 0.05;
+    // Continuous bet frequency curve — value bets scale with strength, bluffs at bottom of range
+    let betFreq: number;
+    if (strength > 0.75) {
+      betFreq = 0.80;                              // Premium: high-frequency value bet
+    } else if (strength > 0.45) {
+      betFreq = 0.35 + (strength - 0.45) * 1.5;    // Medium+: 35%→80% linear
+    } else if (strength > 0.25) {
+      betFreq = 0.15 + (strength - 0.25) * 1.0;    // Medium-: 15%→35% linear
+    } else if (strength > 0.10) {
+      betFreq = 0.20;                              // Weak: bluff ~20%
+    } else {
+      betFreq = 0.05;                              // Air: mostly check
+    }
     raiseFreq = betFreq;
     callFreq = 0;  // can't call when no bet
     foldFreq = 0;  // can always check
@@ -1068,7 +1095,13 @@ function chooseGtoAction(
     const sizeFactor = 0.5 + strength * 0.3;
     const raiseAmount = Math.round(req.pot * sizeFactor);
     const raiseTotal = clampInt(req.currentBet + Math.max(raiseAmount, req.minRaise), minRaiseTotal, maxRaiseTotal);
-    result = raiseTotal >= maxRaiseTotal ? { action: 'allin' } : { action: 'raise', amount: raiseTotal };
+    // Auto all-in when raise commits >90% of remaining stack — leaving crumbs has no strategic value
+    const remainingAfterRaise = req.stack - req.toCall - (raiseTotal - req.currentBet);
+    if (raiseTotal >= maxRaiseTotal || remainingAfterRaise < req.stack * 0.10) {
+      result = { action: 'allin' };
+    } else {
+      result = { action: 'raise', amount: raiseTotal };
+    }
   }
 
   return { result, strength, potOdds, foldFreq, callFreq, raiseFreq };

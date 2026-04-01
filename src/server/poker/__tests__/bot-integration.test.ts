@@ -104,6 +104,141 @@ describe('Bot integration', () => {
     expect(nitFolds).toBeGreaterThan(maniacFolds);
   });
 
+  it('maniac bluffs postflop on dry board with air', async () => {
+    const trials = 40;
+    let betCount = 0;
+
+    for (let i = 0; i < trials; i++) {
+      const maniac = createAgent('maniac');
+      notifyNewHand(maniac, 0, 1000, 2);
+      maniac.notify({ type: 'hole_cards', cards: ['2s', '5s'] });
+      maniac.notify({ type: 'street', name: 'flop', board: ['Ah', '9d', '2c'] });
+
+      const action = await maniac.requestAction({
+        street: 'flop',
+        board: ['Ah', '9d', '2c'],
+        pot: 60,
+        currentBet: 0,
+        toCall: 0,
+        minRaise: 20,
+        stack: 960,
+        history: [],
+      });
+
+      if (action.action === 'raise' || action.action === 'allin') betCount++;
+    }
+
+    // Maniac (bluffRate 0.18, looseness 0.82) should bluff sometimes with air
+    expect(betCount).toBeGreaterThan(0);
+  }, 30000);
+
+  it('adaptive bets two pair for value on paired board', async () => {
+    const trials = 40;
+    let betCount = 0;
+
+    for (let i = 0; i < trials; i++) {
+      const adaptive = createAgent('adaptive');
+      notifyNewHand(adaptive, 0, 1000, 2);
+      adaptive.notify({ type: 'hole_cards', cards: ['Kc', '6s'] });
+      adaptive.notify({ type: 'street', name: 'turn', board: ['Ad', '9h', '9c', 'Ks'] });
+
+      const action = await adaptive.requestAction({
+        street: 'turn',
+        board: ['Ad', '9h', '9c', 'Ks'],
+        pot: 200,
+        currentBet: 0,
+        toCall: 0,
+        minRaise: 20,
+        stack: 900,
+        history: [],
+      });
+
+      if (action.action === 'raise' || action.action === 'allin') betCount++;
+    }
+
+    // Adaptive with two pair (KK99) should thin value bet
+    expect(betCount).toBeGreaterThan(0);
+  }, 30000);
+
+  it('GTO bets two pair on paired board at reasonable frequency', async () => {
+    const trials = 60;
+    let betCount = 0;
+
+    for (let i = 0; i < trials; i++) {
+      const gto = createAgent('gto');
+      notifyNewHand(gto, 0, 1000, 2);
+      gto.notify({ type: 'hole_cards', cards: ['5h', '5d'] });
+      gto.notify({ type: 'street', name: 'flop', board: ['Ad', '9h', '9c'] });
+
+      const action = await gto.requestAction({
+        street: 'flop',
+        board: ['Ad', '9h', '9c'],
+        pot: 60,
+        currentBet: 0,
+        toCall: 0,
+        minRaise: 20,
+        stack: 960,
+        history: [],
+      });
+
+      if (action.action === 'raise' || action.action === 'allin') betCount++;
+    }
+
+    // GTO with two pair (9955) should bet more than 10% of the time
+    expect(betCount).toBeGreaterThan(trials * 0.10);
+  }, 30000);
+
+  it('maniac raises preflop with trash hands', async () => {
+    const trials = 30;
+    let raiseCount = 0;
+
+    for (let i = 0; i < trials; i++) {
+      const maniac = createAgent('maniac');
+      notifyNewHand(maniac, 0, 1000, 2);
+      maniac.notify({ type: 'hole_cards', cards: ['8h', '3d'] });
+
+      const action = await maniac.requestAction({
+        street: 'preflop',
+        board: [],
+        pot: 30,
+        currentBet: 20,
+        toCall: 10,
+        minRaise: 20,
+        stack: 990,
+        history: [],
+      });
+
+      if (action.action === 'raise' || action.action === 'allin') raiseCount++;
+    }
+
+    // Maniac should raise preflop with 83o at some frequency
+    expect(raiseCount).toBeGreaterThan(0);
+  });
+
+  it('GTO auto-shoves when raise commits >90% of stack', async () => {
+    const gto = createAgent('gto');
+    notifyNewHand(gto, 0, 100, 2);
+    gto.notify({ type: 'hole_cards', cards: ['Ah', 'Kd'] });
+
+    // With only 100 stack, any raise will commit most of the stack
+    const action = await gto.requestAction({
+      street: 'preflop',
+      board: [],
+      pot: 30,
+      currentBet: 20,
+      toCall: 20,
+      minRaise: 20,
+      stack: 80,
+      initialStack: 100,
+      history: [],
+    });
+
+    // AKo with 5BB should go all-in, not raise leaving crumbs
+    if (action.action === 'raise' || action.action === 'allin') {
+      expect(action.action).toBe('allin');
+    }
+  });
+
   it('human pressure increases aggression vs human players', async () => {
     const trials = 30;
     let raiseCountWithHuman = 0;
