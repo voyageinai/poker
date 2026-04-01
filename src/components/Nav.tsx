@@ -14,6 +14,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery';
 
 const links = [
   { href: '/',            label: '大厅' },
+  { href: '/records',     label: '战绩' },
 ];
 
 export default function Nav() {
@@ -119,6 +120,13 @@ function MobileAuthArea({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuO
                   </Link>
                 )}
               </div>
+              <Link
+                href="/records"
+                className="text-sm text-text-secondary no-underline hover:text-text-primary py-1"
+                onClick={() => setMenuOpen(false)}
+              >
+                战绩
+              </Link>
               <MobileRedeemForm />
               <Button
                 variant="ghost"
