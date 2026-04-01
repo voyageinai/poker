@@ -102,6 +102,7 @@ export interface TableState {
   currentBet: number; // amount to call this street
   minRaise: number;
   lastRaiserSeat: number; // -1 if no raise this street
+  streetRaiseCount: number; // number of raises this street (cap = 4)
   deck: Card[];       // remaining deck (server-only, never sent to clients)
   streetActed: Set<number>; // seats that have acted this street
 }

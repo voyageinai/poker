@@ -37,6 +37,8 @@ export type TableEvent =
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MIN_PLAYERS = 2;
+/** Max raises per street. After this many raises, players can only call or fold. */
+const MAX_RAISES_PER_STREET = 4;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,6 +119,7 @@ export function createTableState(
     currentBet: 0,
     minRaise: bigBlind,
     lastRaiserSeat: -1,
+    streetRaiseCount: 0,
     deck: [],
     streetActed: new Set(),
     // Store blinds for reset
@@ -175,6 +178,7 @@ export function startHand(
   state.currentBet = state._bigBlind;
   state.minRaise = state._bigBlind;
   state.lastRaiserSeat = -1;
+  state.streetRaiseCount = 0;
   state.streetActed = new Set();
   state.deck = freshShuffledDeck();
   state.status = 'preflop';
@@ -335,6 +339,18 @@ export function applyAction(
       break;
     }
     case 'raise': {
+      // Raise cap: if max raises reached, downgrade to call
+      if (state.streetRaiseCount >= MAX_RAISES_PER_STREET) {
+        const callAmt = Math.min(toCall, player.stack);
+        player.stack -= callAmt;
+        player.streetBet += callAmt;
+        player.totalBet += callAmt;
+        state.pot.main += callAmt;
+        state.pot.total += callAmt;
+        player.lastAction = 'call';
+        if (player.stack === 0) player.status = 'allin';
+        break;
+      }
       const raiseTotal = action.amount ?? 0;
       if (raiseTotal < state.currentBet + state.minRaise) {
         throw new Error(`Raise must be at least ${state.currentBet + state.minRaise}`);
@@ -350,6 +366,7 @@ export function applyAction(
       state.minRaise = raiseTotal - prevBet;
       state.currentBet = raiseTotal;
       state.lastRaiserSeat = seat;
+      state.streetRaiseCount++;
       player.lastAction = 'raise';
       if (player.stack === 0) player.status = 'allin';
       // Reopen action: everyone else needs to act again
@@ -371,6 +388,7 @@ export function applyAction(
         // An incomplete all-in raise does NOT reopen betting per poker rules.
         if (raiseSize >= state.minRaise) {
           state.minRaise = raiseSize;
+          state.streetRaiseCount++;
           state.streetActed = new Set([seat]);
         }
       }
@@ -417,7 +435,11 @@ function advanceGame(
     }
     state.activeSeat = next;
     const toCall = state.currentBet - (state.players[next]?.streetBet ?? 0);
-    events.push({ kind: 'action_request', seat: next, toCall, minRaise: state.minRaise });
+    // When raise cap reached, signal with huge minRaise so no one can raise
+    const effectiveMinRaise = state.streetRaiseCount >= MAX_RAISES_PER_STREET
+      ? Number.MAX_SAFE_INTEGER
+      : state.minRaise;
+    events.push({ kind: 'action_request', seat: next, toCall, minRaise: effectiveMinRaise });
     return events;
   }
 
@@ -442,6 +464,7 @@ function dealNextStreet(
   state.currentBet = 0;
   state.minRaise = state._bigBlind;
   state.lastRaiserSeat = -1;
+  state.streetRaiseCount = 0;
 
   // Rebuild pot from totalBets
   rebuildPot(state);
@@ -665,7 +688,9 @@ export function toClientState(state: TableState, viewerUserId: string | null): C
     board: state.board,
     pot: state.pot,
     currentBet: state.currentBet,
-    minRaise: state.minRaise,
+    minRaise: state.streetRaiseCount >= MAX_RAISES_PER_STREET
+      ? Number.MAX_SAFE_INTEGER
+      : state.minRaise,
     players: state.players.map((p): ClientPlayerState | null => {
       if (!p) return null;
       return {

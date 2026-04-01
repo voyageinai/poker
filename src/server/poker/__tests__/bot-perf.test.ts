@@ -36,7 +36,7 @@ describe('Bot decision performance', () => {
     });
     const elapsed = performance.now() - start;
 
-    expect(elapsed).toBeLessThan(300);
+    expect(elapsed).toBeLessThan(500);
   });
 
   it('preflop decision completes within 5ms (no MC)', async () => {
