@@ -143,7 +143,19 @@ export default function TableFelt({
 
       {/* Seats */}
       {tableState.players.map((p, seatIdx) => {
-        const pos = getSeatPosition(seatIdx, totalSeats, heroSeat, compact);
+        // In compact (mobile) mode, hero is rendered separately — skip
+        if (compact && heroSeat !== null && seatIdx === heroSeat) return null;
+
+        const pos = compact && heroSeat !== null
+          ? (() => {
+              const opponentSeats = tableState.players
+                .map((_, i) => i)
+                .filter(i => i !== heroSeat);
+              const opponentIndex = opponentSeats.indexOf(seatIdx);
+              return getMobileSeatPosition(opponentIndex, opponentSeats.length);
+            })()
+          : getSeatPosition(seatIdx, totalSeats, heroSeat, compact);
+
         if (p) {
           const showdownData = showdown?.find(r => r.seat === p.seatIndex);
           return (
@@ -164,6 +176,7 @@ export default function TableFelt({
                 isMe={p.userId === currentUserId}
                 isWinner={winnerSeats.has(p.seatIndex)}
                 compact={compact}
+                totalSeats={totalSeats}
               />
             </div>
           );
@@ -193,7 +206,17 @@ export default function TableFelt({
       {/* Street bets */}
       {tableState.players.map((p, seatIdx) => {
         if (!p || p.streetBet <= 0) return null;
-        const seatPos = getSeatPosition(seatIdx, totalSeats, heroSeat, compact);
+        if (compact && heroSeat !== null && seatIdx === heroSeat) return null;
+
+        const seatPos = compact && heroSeat !== null
+          ? (() => {
+              const opponentSeats = tableState.players
+                .map((_, i) => i)
+                .filter(i => i !== heroSeat);
+              const opponentIndex = opponentSeats.indexOf(seatIdx);
+              return getMobileSeatPosition(opponentIndex, opponentSeats.length);
+            })()
+          : getSeatPosition(seatIdx, totalSeats, heroSeat, compact);
         const betPos = getBetPosition(seatPos);
         return (
           <div
