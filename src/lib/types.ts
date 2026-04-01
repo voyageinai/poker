@@ -301,7 +301,7 @@ export type PbpServerMessage =
       handId: string;
       seat: number;
       stack: number;
-      players: Array<{ seat: number; displayName: string; stack: number }>;
+      players: Array<{ seat: number; displayName: string; stack: number; isBot: boolean; elo?: number }>;
       smallBlind: number;
       bigBlind: number;
       buttonSeat: number;

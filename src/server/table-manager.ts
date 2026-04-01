@@ -316,7 +316,16 @@ export class TableManager {
         stack: p.stack,
         players: this.state.players
           .filter((pl): pl is PlayerState => pl !== null)
-          .map(pl => ({ seat: pl.seatIndex, displayName: pl.displayName, stack: pl.stack })),
+          .map(pl => {
+            const seatInfo = this.agents.get(pl.seatIndex);
+            const isBot = seatInfo?.botId !== null;
+            let elo: number | undefined;
+            if (!isBot) {
+              const user = db.getUserById(pl.userId);
+              if (user) elo = user.elo;
+            }
+            return { seat: pl.seatIndex, displayName: pl.displayName, stack: pl.stack, isBot, elo };
+          }),
         smallBlind: this.state._smallBlind,
         bigBlind: this.state._bigBlind,
         buttonSeat: this.state.buttonSeat,

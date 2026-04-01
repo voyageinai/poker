@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, computeExploit, type HandActionRecord } from '../agents';
 import { postflopStrengthMC } from '../agents';
-import type { Card } from '@/lib/types';
+import type { Card, PbpServerMessage } from '@/lib/types';
 
 describe('STYLE_CONFIG intelligence fields', () => {
   const styles = Object.keys(STYLE_CONFIG_FOR_TEST) as Array<keyof typeof STYLE_CONFIG_FOR_TEST>;
@@ -221,5 +221,27 @@ describe('Monte Carlo postflop equity', () => {
     const eq = postflopStrengthMC(holeCards, board, 2);
     expect(eq).toBeGreaterThanOrEqual(0);
     expect(eq).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('PBP new_hand extension type check', () => {
+  it('PbpServerMessage new_hand type includes isBot and elo', () => {
+    const msg: PbpServerMessage = {
+      type: 'new_hand',
+      handId: 'test',
+      seat: 0,
+      stack: 1000,
+      players: [
+        { seat: 0, displayName: 'Alice', stack: 1000, isBot: false, elo: 1200 },
+        { seat: 1, displayName: 'Bot1', stack: 1000, isBot: true },
+      ],
+      smallBlind: 10,
+      bigBlind: 20,
+      buttonSeat: 0,
+    };
+    expect(msg.players[0].isBot).toBe(false);
+    expect(msg.players[0].elo).toBe(1200);
+    expect(msg.players[1].isBot).toBe(true);
+    expect(msg.players[1].elo).toBeUndefined();
   });
 });
