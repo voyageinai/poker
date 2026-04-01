@@ -47,6 +47,8 @@ export class TableManager {
   private _nextHandTimer: ReturnType<typeof setTimeout> | null = null;
   /** Action history for the current street, passed to bots for context */
   private streetHistory: Array<{ seat: number; action: ActionType; amount: number }> = [];
+  /** Per-seat starting stack for the current hand (before any bets including blinds) */
+  private initialStacks = new Map<number, number>();
 
   // Per-table action queue: serializes all mutations
   private actionQueue: Promise<void> = Promise.resolve();
@@ -282,6 +284,14 @@ export class TableManager {
       return;
     }
 
+    // Record initial stacks (current stack + blinds already posted)
+    this.initialStacks.clear();
+    for (const p of this.state.players) {
+      if (p && p.status === 'active') {
+        this.initialStacks.set(p.seatIndex, p.stack + p.totalBet);
+      }
+    }
+
     db.createHand({
       id: this.handId,
       table_id: this.tableId,
@@ -299,7 +309,7 @@ export class TableManager {
           seat_index: p.seatIndex,
           user_id: p.userId,
           bot_id: seatInfo?.botId ?? null,
-          stack_start: p.stack + p.totalBet,
+          stack_start: this.initialStacks.get(p.seatIndex) ?? p.stack + p.totalBet,
           hole_cards: null,
         });
       }
@@ -396,6 +406,7 @@ export class TableManager {
             toCall: event.toCall,
             minRaise: event.minRaise,
             stack: player.stack,
+            initialStack: this.initialStacks.get(seat) ?? player.stack + player.totalBet,
             history: [...this.streetHistory],
           });
 
@@ -782,6 +793,11 @@ export class TableManager {
       clearTimeout(timer);
       this.bustTimers.delete(seat);
     }
+
+    // Explicitly tell the client busted state is over
+    wsHub.sendToUser(this.tableId, userId, {
+      type: 'rebuy_success', seat, stack: minBuyin,
+    } satisfies WsServerMessage);
 
     this.broadcastState();
     this.maybeStartHand();

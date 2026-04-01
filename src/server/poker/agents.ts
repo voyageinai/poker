@@ -24,6 +24,8 @@ export interface ActionRequest {
   toCall: number;
   minRaise: number;
   stack: number;
+  /** Stack at the start of this hand (before any bets). Falls back to stack if not provided. */
+  initialStack?: number;
   history: Array<{ seat: number; action: ActionType; amount: number }>;
 }
 
@@ -808,18 +810,44 @@ function chooseBuiltinAction(
   cfg?: StyleParams,
 ): PokerAction {
   if (!cfg) cfg = STYLE_CONFIG[style];
+
+  // ─── SPR / pot commitment awareness ──────────────────────────────────
+  const initStack = req.initialStack ?? req.stack;
+  const chipsInPot = initStack - req.stack;
+  const commitment = chipsInPot / Math.max(initStack, 1); // 0..1
+  const spr = req.stack / Math.max(req.pot, 1); // stack-to-pot ratio
+
+  // When deeply committed (>40% of stack in pot), shove or call — never fold
+  if (req.street !== 'preflop' && commitment > 0.40 && spr < 2) {
+    if (req.toCall === 0) {
+      // No bet to face but pot-committed: shove for value/protection
+      if (strength > 0.25) return { action: 'allin' };
+      return { action: 'check' };
+    }
+    // Facing a bet while pot-committed: call (or shove) with almost anything
+    if (strength > 0.20) return { action: 'allin' };
+    // Even trash hands get good odds when this committed
+    if (req.toCall <= req.stack * 0.5) return { action: 'call' };
+    return { action: 'allin' };
+  }
+
+  // Moderate commitment (>25% stack in pot, SPR < 4): lower fold thresholds
+  const commitmentDiscount = (req.street !== 'preflop' && commitment > 0.25 && spr < 4)
+    ? 0.10 + commitment * 0.15 // up to ~0.25 discount at full commitment
+    : 0;
+
   const callPressure = req.toCall / Math.max(req.stack + req.toCall, 1);
 
   // Call threshold: potOdds sets a floor, but looseness actively lowers it.
   // Nit (0.18): base ~0.36, potOdds barely discounted → tight
   // Station (0.72): base ~0.20, potOdds discounted 36% → calls almost anything
-  const baseThreshold = 0.40 - cfg.looseness * 0.28 + callPressure * 0.12;
+  const baseThreshold = 0.40 - cfg.looseness * 0.28 + callPressure * 0.12 - commitmentDiscount;
   const oddsThreshold = potOdds * (1 - cfg.looseness * 0.5);
   const callThreshold = Math.max(baseThreshold, oddsThreshold);
 
   // Raise threshold: aggressive styles raise thinner
   // Nit: 0.65  TAG: 0.55  LAG: 0.44  Station: 0.66
-  const raiseThreshold = 0.70 - cfg.aggression * 0.36 + potOdds * 0.04;
+  const raiseThreshold = 0.70 - cfg.aggression * 0.36 + potOdds * 0.04 - commitmentDiscount;
 
   // Bet sizing adjustment
   const betSizeRatio = req.toCall / Math.max(req.pot, 1);
@@ -833,6 +861,10 @@ function chooseBuiltinAction(
 
   // No bet to face: check or bet
   if (req.toCall === 0) {
+    // Low SPR: prefer shoving over slowplaying
+    if (spr < 3 && strength > 0.40) {
+      return { action: 'allin' };
+    }
     // Trapper slowplay: with strong hands, check to induce a bet (then check-raise later)
     if (strength > 0.75 && roll(cfg.slowplayRate)) {
       return { action: 'check' };
@@ -887,11 +919,25 @@ function chooseRaiseAction(
 
   const potComponent = Math.round(req.pot * (0.35 + cfg.aggression * 0.65));
   const pressureComponent = Math.round(req.toCall + req.minRaise + strength * req.pot * 0.35);
-  const raiseTotal = clampInt(
+  let raiseTotal = clampInt(
     Math.max(minRaiseTotal, req.currentBet + Math.max(potComponent, pressureComponent)),
     minRaiseTotal,
     maxRaiseTotal,
   );
+
+  // Preflop sizing cap: non-premium hands shouldn't commit >25% of initial stack
+  // Premium hands (strength > 0.75) are exempt — they can go big
+  if (req.street === 'preflop' && strength < 0.75) {
+    const rInitStack = req.initialStack ?? req.stack;
+    const maxPreflop = Math.round(rInitStack * 0.25);
+    const chipsInPot = rInitStack - req.stack;
+    const wouldCommit = chipsInPot + (raiseTotal - req.currentBet + req.toCall);
+    if (wouldCommit > maxPreflop) {
+      // Cap the raise so total commitment stays under 25%
+      const capped = req.currentBet + Math.max(maxPreflop - chipsInPot - req.toCall, req.minRaise);
+      raiseTotal = clampInt(capped, minRaiseTotal, maxRaiseTotal);
+    }
+  }
 
   return raiseTotal >= maxRaiseTotal ? { action: 'allin' } : { action: 'raise', amount: raiseTotal };
 }
@@ -935,6 +981,20 @@ function chooseGtoAction(
     ? preflopStrength(holeCards)
     : postflopStrengthMC(holeCards, req.board, opponents);
   const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
+
+  // SPR / commitment check — even GTO should never fold when pot-committed
+  const gtoInitStack = req.initialStack ?? req.stack;
+  const gtoChipsIn = gtoInitStack - req.stack;
+  const gtoCommitment = gtoChipsIn / Math.max(gtoInitStack, 1);
+  const gtoSpr = req.stack / Math.max(req.pot, 1);
+  if (req.street !== 'preflop' && gtoCommitment > 0.40 && gtoSpr < 2) {
+    if (req.toCall === 0) {
+      const result: PokerAction = strength > 0.25 ? { action: 'allin' } : { action: 'check' };
+      return { result, strength, potOdds, foldFreq: 0, callFreq: 0, raiseFreq: strength > 0.25 ? 1 : 0 };
+    }
+    const result: PokerAction = { action: 'allin' };
+    return { result, strength, potOdds, foldFreq: 0, callFreq: 0, raiseFreq: 1 };
+  }
 
   // MDF (Minimum Defense Frequency) = 1 - bet/(bet+pot)
   // This is how often we must continue to prevent opponent from profiting with any two cards

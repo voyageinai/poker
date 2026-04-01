@@ -120,6 +120,7 @@ export type WsServerMessage =
   | { type: 'player_joined'; seat: number; player: Omit<PlayerState, 'holeCards' | 'debugInfo'> }
   | { type: 'player_left'; seat: number }
   | { type: 'busted'; seat: number; canRebuy: boolean; timeoutSec: number }
+  | { type: 'rebuy_success'; seat: number; stack: number }
   | { type: 'error'; message: string };
 
 // Client → Server

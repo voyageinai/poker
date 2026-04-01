@@ -147,6 +147,9 @@ export function useTableWs(tableId: string) {
           case 'busted':
             setBusted({ canRebuy: msg.canRebuy, timeoutSec: msg.timeoutSec });
             break;
+          case 'rebuy_success':
+            setBusted(null);
+            break;
           case 'player_action': {
             // Deduplicate: skip if this is the WS echo of our own action we already logged locally
             const local = lastLocalAction.current;
