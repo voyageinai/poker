@@ -930,9 +930,10 @@ function chooseGtoAction(
   req: ActionRequest,
   playerCount: number,
 ): { result: PokerAction; strength: number; potOdds: number; foldFreq: number; callFreq: number; raiseFreq: number } {
+  const opponents = Math.max(1, playerCount - 1);
   const strength = req.street === 'preflop'
     ? preflopStrength(holeCards)
-    : postflopStrength(holeCards, req.board);
+    : postflopStrengthMC(holeCards, req.board, opponents);
   const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
 
   // MDF (Minimum Defense Frequency) = 1 - bet/(bet+pot)

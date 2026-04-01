@@ -247,6 +247,46 @@ describe('PBP new_hand extension type check', () => {
   });
 });
 
+describe('GTO bot uses MC equity', () => {
+  it('GTO chooseGtoAction uses real equity when board is present', async () => {
+    const { BuiltinBotAgent } = await import('../agents');
+    const { SYSTEM_BOTS } = await import('@/lib/system-bots');
+    const gtoDef = SYSTEM_BOTS.find(b => b.style === 'gto')!;
+    const agent = new BuiltinBotAgent('test-user', gtoDef);
+
+    agent.notify({
+      type: 'new_hand',
+      handId: 'test-1',
+      seat: 0,
+      stack: 1000,
+      players: [
+        { seat: 0, displayName: 'GTO', stack: 1000, isBot: true },
+        { seat: 1, displayName: 'Opp', stack: 1000, isBot: true },
+      ],
+      smallBlind: 10,
+      bigBlind: 20,
+      buttonSeat: 0,
+    });
+    agent.notify({ type: 'hole_cards', cards: ['Ah', 'As'] });
+    agent.notify({ type: 'street', name: 'flop', board: ['2c', '7d', '4h'] });
+
+    const result = await agent.requestAction({
+      street: 'flop',
+      board: ['2c', '7d', '4h'],
+      pot: 40,
+      currentBet: 0,
+      toCall: 0,
+      minRaise: 20,
+      stack: 980,
+      history: [],
+    });
+
+    // GTO with AA on a dry board should have high equity (MC-based, not lookup 0.48)
+    expect(result.debug?.equity).toBeGreaterThan(0.7);
+    expect(['raise', 'check', 'allin']).toContain(result.action);
+  });
+});
+
 describe('Human pressure module', () => {
   describe('assessHumanSkill', () => {
     it('low elo = low skill', () => {
