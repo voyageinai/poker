@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, computeExploit, type HandActionRecord } from '../agents';
 import { postflopStrengthMC } from '../agents';
+import { assessHumanSkill, calcHumanPressure } from '../agents';
 import type { Card, PbpServerMessage } from '@/lib/types';
 
 describe('STYLE_CONFIG intelligence fields', () => {
@@ -243,5 +244,51 @@ describe('PBP new_hand extension type check', () => {
     expect(msg.players[0].elo).toBe(1200);
     expect(msg.players[1].isBot).toBe(true);
     expect(msg.players[1].elo).toBeUndefined();
+  });
+});
+
+describe('Human pressure module', () => {
+  describe('assessHumanSkill', () => {
+    it('low elo = low skill', () => {
+      expect(assessHumanSkill(1050, undefined)).toBe('low');
+    });
+    it('high elo = high skill', () => {
+      expect(assessHumanSkill(1500, undefined)).toBe('high');
+    });
+    it('default elo = mid skill', () => {
+      expect(assessHumanSkill(1200, undefined)).toBe('mid');
+    });
+    it('high VPIP with enough hands = low skill regardless of elo', () => {
+      const stats = { hands: 25, vpipRate: 0.60, af: 0.8 };
+      expect(assessHumanSkill(1250, stats)).toBe('low');
+    });
+    it('good stats with high elo = high skill', () => {
+      const stats = { hands: 25, vpipRate: 0.30, af: 2.0 };
+      expect(assessHumanSkill(1450, stats)).toBe('high');
+    });
+  });
+
+  describe('calcHumanPressure', () => {
+    it('returns higher pressure for low skill', () => {
+      const low = calcHumanPressure('low', 'tag');
+      const high = calcHumanPressure('high', 'tag');
+      expect(low).toBeGreaterThan(high);
+    });
+    it('caps pressure for station at 0.05', () => {
+      const p = calcHumanPressure('low', 'station');
+      expect(p).toBeLessThanOrEqual(0.05);
+    });
+    it('caps pressure for maniac at 0.05', () => {
+      const p = calcHumanPressure('low', 'maniac');
+      expect(p).toBeLessThanOrEqual(0.05);
+    });
+    it('allows higher cap for nit (0.12)', () => {
+      const p = calcHumanPressure('low', 'nit');
+      expect(p).toBeLessThanOrEqual(0.12);
+      expect(p).toBeGreaterThan(0.05);
+    });
+    it('always returns a non-negative value', () => {
+      expect(calcHumanPressure('high', 'gto')).toBeGreaterThanOrEqual(0);
+    });
   });
 });

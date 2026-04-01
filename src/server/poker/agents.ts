@@ -412,6 +412,41 @@ export function getPositionFactor(position: Position): number {
   }
 }
 
+// ─── Human pressure module ──────────────────────────────────────────────────
+
+export type HumanSkillLevel = 'low' | 'mid' | 'high';
+
+export function assessHumanSkill(
+  elo: number | undefined,
+  stats: { hands: number; vpipRate: number; af: number } | undefined,
+): HumanSkillLevel {
+  const eloScore = elo ?? 1200;
+  if (stats && stats.hands >= 20) {
+    if (eloScore < 1100 || stats.vpipRate > 0.55 || stats.af < 0.5) return 'low';
+    if (eloScore > 1400 && stats.vpipRate >= 0.22 && stats.vpipRate <= 0.38 && stats.af > 1.5) return 'high';
+  } else {
+    if (eloScore < 1100) return 'low';
+    if (eloScore > 1400) return 'high';
+  }
+  return 'mid';
+}
+
+export function calcHumanPressure(skill: HumanSkillLevel, style: SystemBotStyle): number {
+  const base: Record<HumanSkillLevel, number> = {
+    low: 0.08,
+    mid: 0.05,
+    high: 0.01,
+  };
+  const cap: Partial<Record<SystemBotStyle, number>> = {
+    station: 0.05,
+    maniac: 0.05,
+    nit: 0.12,
+  };
+  const pressure = base[skill] + 0.03;
+  const maxPressure = cap[style] ?? 0.10;
+  return Math.min(pressure, maxPressure);
+}
+
 export class BuiltinBotAgent implements PlayerAgent {
   readonly timeoutMs = BOT_ACTION_TIMEOUT_MS;
   private holeCards: [Card, Card] | null = null;
@@ -434,6 +469,9 @@ export class BuiltinBotAgent implements PlayerAgent {
   // ─── Multi-street memory ─────────────────────────────────────────────────
   private handActions: HandActionRecord = { preflop: [], flop: [], turn: [], river: [] };
 
+  // ─── Human pressure tracking ────────────────────────────────────────────
+  private playerMeta = new Map<number, { isBot: boolean; elo?: number }>();
+
   constructor(
     readonly userId: string,
     private readonly definition: SystemBotDefinition,
@@ -454,6 +492,11 @@ export class BuiltinBotAgent implements PlayerAgent {
           msg.buttonSeat,
           msg.players.map(p => p.seat),
         );
+        // Track player metadata for human pressure
+        this.playerMeta.clear();
+        for (const p of msg.players) {
+          this.playerMeta.set(p.seat, { isBot: p.isBot, elo: p.elo });
+        }
         // Ensure stats exist for all opponents
         for (const p of msg.players) {
           if (p.seat !== this.mySeat && !this.opponentStats.has(p.seat)) {
@@ -616,6 +659,25 @@ export class BuiltinBotAgent implements PlayerAgent {
         if (patterns.timesRaised >= 2) patternPenalty += 0.10;
         adjustedStrength = clamp01(adjustedStrength - patternPenalty * cfg.patternSensitivity);
       }
+    }
+
+    // Human pressure (final adjustment layer)
+    for (const [seat, meta] of this.playerMeta) {
+      if (seat === this.mySeat || meta.isBot) continue;
+      const oppStats = this.opponentStats.get(seat);
+      let statsForAssess: { hands: number; vpipRate: number; af: number } | undefined;
+      if (oppStats && oppStats.hands >= 3) {
+        statsForAssess = {
+          hands: oppStats.hands,
+          vpipRate: oppStats.vpip / oppStats.hands,
+          af: oppStats.passActions > 0 ? oppStats.aggActions / oppStats.passActions : 1,
+        };
+      }
+      const skill = assessHumanSkill(meta.elo, statsForAssess);
+      const pressure = calcHumanPressure(skill, this.definition.style);
+      cfg.aggression = clamp01(cfg.aggression + pressure);
+      cfg.bluffRate = clamp01(cfg.bluffRate + pressure * 0.5);
+      break; // Apply pressure based on first human found
     }
 
     const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
