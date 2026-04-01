@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier } from '../agents';
+import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, type HandActionRecord } from '../agents';
 
 describe('STYLE_CONFIG intelligence fields', () => {
   const styles = Object.keys(STYLE_CONFIG_FOR_TEST) as Array<keyof typeof STYLE_CONFIG_FOR_TEST>;
@@ -87,5 +87,65 @@ describe('Bet sizing reads', () => {
 
   it('zero bet returns 1.0 (no adjustment)', () => {
     expect(getBetSizingMultiplier(0)).toBeCloseTo(1.0, 2);
+  });
+});
+
+describe('Multi-street memory', () => {
+  it('detects checkThenBet pattern', () => {
+    const actions: HandActionRecord = {
+      preflop: [],
+      flop: [{ seat: 2, action: 'check', amount: 0 }],
+      turn: [{ seat: 2, action: 'raise', amount: 100 }],
+      river: [],
+    };
+    const patterns = detectPatterns(2, actions, 'turn');
+    expect(patterns.checkThenBet).toBe(true);
+  });
+
+  it('detects betBetBet pattern', () => {
+    const actions: HandActionRecord = {
+      preflop: [{ seat: 1, action: 'raise', amount: 40 }],
+      flop: [{ seat: 1, action: 'raise', amount: 80 }],
+      turn: [{ seat: 1, action: 'raise', amount: 160 }],
+      river: [],
+    };
+    const patterns = detectPatterns(1, actions, 'turn');
+    expect(patterns.betBetBet).toBe(true);
+  });
+
+  it('detects checkCheckBet pattern', () => {
+    const actions: HandActionRecord = {
+      preflop: [],
+      flop: [{ seat: 3, action: 'check', amount: 0 }],
+      turn: [{ seat: 3, action: 'check', amount: 0 }],
+      river: [{ seat: 3, action: 'raise', amount: 200 }],
+    };
+    const patterns = detectPatterns(3, actions, 'river');
+    expect(patterns.checkCheckBet).toBe(true);
+  });
+
+  it('counts timesRaised correctly', () => {
+    const actions: HandActionRecord = {
+      preflop: [{ seat: 1, action: 'raise', amount: 40 }],
+      flop: [{ seat: 1, action: 'raise', amount: 80 }, { seat: 1, action: 'raise', amount: 160 }],
+      turn: [],
+      river: [],
+    };
+    const patterns = detectPatterns(1, actions, 'flop');
+    expect(patterns.timesRaised).toBe(3);
+  });
+
+  it('returns no patterns for passive play', () => {
+    const actions: HandActionRecord = {
+      preflop: [{ seat: 0, action: 'call', amount: 20 }],
+      flop: [{ seat: 0, action: 'call', amount: 40 }],
+      turn: [{ seat: 0, action: 'call', amount: 80 }],
+      river: [],
+    };
+    const patterns = detectPatterns(0, actions, 'turn');
+    expect(patterns.checkThenBet).toBe(false);
+    expect(patterns.betBetBet).toBe(false);
+    expect(patterns.checkCheckBet).toBe(false);
+    expect(patterns.timesRaised).toBe(0);
   });
 });

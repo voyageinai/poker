@@ -351,6 +351,9 @@ export class BuiltinBotAgent implements PlayerAgent {
   private currentStreet: 'preflop' | 'flop' | 'turn' | 'river' = 'preflop';
   private preflopActors = new Set<number>();  // seats that acted preflop (non-blind)
 
+  // ─── Multi-street memory ─────────────────────────────────────────────────
+  private handActions: HandActionRecord = { preflop: [], flop: [], turn: [], river: [] };
+
   constructor(
     readonly userId: string,
     private readonly definition: SystemBotDefinition,
@@ -365,6 +368,7 @@ export class BuiltinBotAgent implements PlayerAgent {
         this.bigBlind = msg.bigBlind ?? 20;
         this.currentStreet = 'preflop';
         this.preflopActors.clear();
+        this.handActions = { preflop: [], flop: [], turn: [], river: [] };
         this.myPosition = calcPosition(
           msg.seat,
           msg.buttonSeat,
@@ -391,6 +395,8 @@ export class BuiltinBotAgent implements PlayerAgent {
         this.currentStreet = msg.name as 'preflop' | 'flop' | 'turn' | 'river';
         break;
       case 'player_action': {
+        // Track all actions for multi-street pattern detection
+        this.handActions[this.currentStreet].push({ seat: msg.seat, action: msg.action, amount: msg.amount });
         if (msg.seat === this.mySeat) break;
         const s = this.opponentStats.get(msg.seat);
         if (!s) break;
@@ -534,7 +540,22 @@ export class BuiltinBotAgent implements PlayerAgent {
     const posFactor = getPositionFactor(this.myPosition) * cfg.positionSensitivity;
     const isLatePosition = this.myPosition === 'BTN' || this.myPosition === 'CO';
     cfg.bluffRate = clamp01(cfg.bluffRate + (isLatePosition ? 0.03 : -0.02) * cfg.positionSensitivity);
-    const adjustedStrength = clamp01(strength - crowdPenalty + cfg.looseness * 0.25 + posFactor);
+    let adjustedStrength = clamp01(strength - crowdPenalty + cfg.looseness * 0.25 + posFactor);
+
+    // Multi-street pattern adjustment (lower effective strength when danger patterns detected)
+    if (req.toCall > 0) {
+      const lastAggressor = req.history.filter(h => h.action === 'raise' || h.action === 'allin').pop();
+      if (lastAggressor && lastAggressor.seat !== this.mySeat) {
+        const patterns = detectPatterns(lastAggressor.seat, this.handActions, req.street);
+        let patternPenalty = 0;
+        if (patterns.checkThenBet) patternPenalty += 0.05;
+        if (patterns.betBetBet) patternPenalty += 0.06;
+        if (patterns.checkCheckBet) patternPenalty += 0.08;
+        if (patterns.timesRaised >= 2) patternPenalty += 0.10;
+        adjustedStrength = clamp01(adjustedStrength - patternPenalty * cfg.patternSensitivity);
+      }
+    }
+
     const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
     const action = chooseBuiltinAction(style, adjustedStrength, potOdds, req, cfg);
 
@@ -572,6 +593,61 @@ export class BuiltinBotAgent implements PlayerAgent {
   }
 
   dispose(): void {}
+}
+
+// ─── Multi-street memory & pattern detection ────────────────────────────────
+
+export type HandActionRecord = Record<
+  'preflop' | 'flop' | 'turn' | 'river',
+  Array<{ seat: number; action: ActionType; amount: number }>
+>;
+
+export interface OpponentHandPattern {
+  checkThenBet: boolean;
+  betBetBet: boolean;
+  checkCheckBet: boolean;
+  timesRaised: number;
+}
+
+const STREET_ORDER: Array<'preflop' | 'flop' | 'turn' | 'river'> = ['preflop', 'flop', 'turn', 'river'];
+const AGG_ACTIONS = new Set<ActionType>(['raise', 'allin']);
+
+export function detectPatterns(
+  seat: number,
+  actions: HandActionRecord,
+  currentStreet: 'preflop' | 'flop' | 'turn' | 'river',
+): OpponentHandPattern {
+  const streetIdx = STREET_ORDER.indexOf(currentStreet);
+
+  function streetSummary(street: 'preflop' | 'flop' | 'turn' | 'river'): 'agg' | 'passive' | 'call' | 'none' {
+    const seatActions = actions[street].filter(a => a.seat === seat);
+    if (seatActions.length === 0) return 'none';
+    if (seatActions.some(a => AGG_ACTIONS.has(a.action))) return 'agg';
+    if (seatActions.some(a => a.action === 'check')) return 'passive';
+    return 'call';
+  }
+
+  const summaries = STREET_ORDER.slice(0, streetIdx + 1).map(s => streetSummary(s));
+
+  const checkThenBet = summaries.length >= 2
+    && summaries[summaries.length - 2] === 'passive'
+    && summaries[summaries.length - 1] === 'agg';
+
+  const aggStreaks = summaries.filter(s => s === 'agg').length;
+  const betBetBet = aggStreaks >= 2 && summaries[summaries.length - 1] === 'agg';
+
+  let checkCheckBet = false;
+  if (summaries.length >= 3 && summaries[summaries.length - 1] === 'agg') {
+    const prevPassive = summaries.slice(0, -1).filter(s => s === 'passive').length;
+    checkCheckBet = prevPassive >= 2;
+  }
+
+  let timesRaised = 0;
+  for (const street of STREET_ORDER.slice(0, streetIdx + 1)) {
+    timesRaised += actions[street].filter(a => a.seat === seat && AGG_ACTIONS.has(a.action)).length;
+  }
+
+  return { checkThenBet, betBetBet, checkCheckBet, timesRaised };
 }
 
 /** Returns a callThreshold multiplier based on bet-to-pot ratio. */
