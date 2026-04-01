@@ -602,10 +602,25 @@ function doShowdown(
     }
   }
 
-  events.push({ kind: 'hand_complete', winners, pot: builtPot.total });
+  const uncalled = calcUncalledBet(state);
+  events.push({ kind: 'hand_complete', winners, pot: builtPot.total - uncalled });
   state.status = 'hand_complete';
   state.activeSeat = -1;
   return events;
+}
+
+/**
+ * Calculate the uncalled portion of the highest bet.
+ * If only one player has the maximum totalBet, the excess over the
+ * second-highest totalBet is "uncalled" and should be returned / excluded.
+ */
+function calcUncalledBet(state: TableState): number {
+  const bets = state.players
+    .filter((p): p is PlayerState => p !== null && p.status !== 'sitting_out')
+    .map(p => p.totalBet)
+    .sort((a, b) => b - a);
+  if (bets.length < 2) return 0;
+  return bets[0] - bets[1];
 }
 
 function concludeHand(
@@ -616,7 +631,9 @@ function concludeHand(
   if (!winner) return [];
 
   rebuildPot(state);
-  const pot = state.pot.total;
+  // Subtract uncalled bet: winner's excess over the next-highest totalBet
+  const uncalled = calcUncalledBet(state);
+  const pot = state.pot.total - uncalled;
   winner.stack += pot;
 
   state.status = 'hand_complete';
