@@ -12,6 +12,7 @@ import TableFelt from '@/components/table/TableFelt';
 import ActionBar from '@/components/table/ActionBar';
 import ActionLog from '@/components/table/ActionLog';
 import ShowdownPanel from '@/components/table/ShowdownPanel';
+import HeroSeat from '@/components/table/HeroSeat';
 import { refreshNavChips } from '@/components/Nav';
 import { MessageSquare, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -144,7 +145,6 @@ export default function TablePage() {
   // ─── Mobile Layout ──────────────────────────────────────────────────────────
   if (isMobile) {
     return (
-      // mx-[-0.5rem] cancels the <main px-2> to use full viewport width
       <div className="flex flex-col mx-[-0.5rem] overflow-x-hidden" style={{ height: 'calc(100dvh - 2.75rem)' }}>
         {/* Compact mobile header */}
         <TableHeader
@@ -160,7 +160,7 @@ export default function TablePage() {
           compact
         />
 
-        {/* Table area — overflow visible so seats at edges aren't clipped */}
+        {/* Table area — opponents only in the ellipse */}
         <div className="flex-1 min-h-0 relative overflow-visible">
           <TableFelt
             tableId={tableId}
@@ -175,18 +175,49 @@ export default function TablePage() {
             onSitDown={handleSitDown}
             compact
           />
-
-          {/* Showdown overlay on mobile — positioned above ActionBar */}
-          {showdown && (
-            <div className="absolute bottom-12 left-2 right-2 z-10">
-              <ShowdownPanel
-                showdown={showdown}
-                winnerSeats={winnerSeats}
-                compact
-              />
-            </div>
-          )}
         </div>
+
+        {/* Hero street bet — displayed above hero bar */}
+        {myPlayer && myPlayer.streetBet > 0 && (
+          <div className="flex justify-center -mt-1 mb-1">
+            <span className="mono text-amber font-bold bg-black/50 rounded-[0.25rem] inline-flex items-center gap-[0.2rem] text-[0.75rem] px-[0.4rem] py-[0.15rem]">
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle at 35% 35%, #f5d080, #b8860b)',
+                  flexShrink: 0,
+                }}
+              />
+              {myPlayer.streetBet}
+            </span>
+          </div>
+        )}
+
+        {/* Hero seat — fixed above action bar */}
+        {myPlayer && (
+          <div className="shrink-0 px-2">
+            <HeroSeat
+              player={myPlayer}
+              holeCards={myHoleCards}
+              isActive={tableState.activeSeat === myPlayer.seatIndex}
+              isWinner={winnerSeats.has(myPlayer.seatIndex)}
+            />
+          </div>
+        )}
+
+        {/* Showdown overlay on mobile */}
+        {showdown && (
+          <div className="shrink-0 px-2 py-1">
+            <ShowdownPanel
+              showdown={showdown}
+              winnerSeats={winnerSeats}
+              compact
+            />
+          </div>
+        )}
 
         {/* Fixed bottom action bar */}
         <ActionBar
