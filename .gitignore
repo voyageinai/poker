@@ -1,0 +1,8 @@
+node_modules/
+.next/
+*.db
+*.db-shm
+*.db-wal
+data/bots/
+.env
+tsconfig.tsbuildinfo

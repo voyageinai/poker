@@ -1,0 +1,424 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Dense Data-Art 主题 ──────────────────────────────────────────────────
+   深海军蓝底 #0d1b2a  /  teal accent #00b4d8  /  amber accent #f59e0b
+   始终暗色，shadcn 语义变量直接映射到暗色调色板
+─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── 项目自有调色板 ─────────────────────────────── */
+  --bg-base:       #0d1b2a;
+  --bg-surface:    #112236;
+  --bg-card:       #162d44;
+  --bg-hover:      #1d3a56;
+
+  --teal:          #00b4d8;
+  --teal-dim:      #0077a8;
+  --teal-glow:     rgba(0, 180, 216, 0.15);
+
+  --amber:         #f59e0b;
+  --amber-dim:     #b97a08;
+  --amber-glow:    rgba(245, 158, 11, 0.15);
+
+  --text-primary:  #e2eaf3;
+  --text-secondary:#7a9ab5;
+  --text-muted:    #4a6880;
+
+  --border:        #1e3a54;
+  --border-bright: #2a5070;
+
+  --red-card:      #ef4444;
+  --black-card:    #e2eaf3;
+
+  --win:           #22c55e;
+  --loss:          #ef4444;
+  --fold:          #64748b;
+
+  /* ── Glow / Shadow / Timing tokens ─────────────── */
+  --glow-teal:     0 0 20px rgba(0, 180, 216, 0.30);
+  --glow-teal-lg:  0 0 40px rgba(0, 180, 216, 0.20), 0 0 80px rgba(0, 180, 216, 0.10);
+  --glow-amber:    0 0 20px rgba(245, 158, 11, 0.30);
+  --glow-amber-lg: 0 0 40px rgba(245, 158, 11, 0.20), 0 0 80px rgba(245, 158, 11, 0.10);
+  --glow-win:      0 0 20px rgba(34, 197, 94, 0.30);
+  --glow-win-lg:   0 0 40px rgba(34, 197, 94, 0.20), 0 0 80px rgba(34, 197, 94, 0.10);
+  --glow-loss:     0 0 20px rgba(239, 68, 68, 0.30);
+
+  --shadow-subtle:   0 1px 3px rgba(0,0,0,0.3);
+  --shadow-medium:   0 4px 12px rgba(0,0,0,0.4);
+  --shadow-dramatic: 0 8px 32px rgba(0,0,0,0.5);
+
+  --dur-micro:     100ms;
+  --dur-quick:     200ms;
+  --dur-normal:    350ms;
+  --dur-dramatic:  600ms;
+  --dur-slow:      1000ms;
+
+  /* ── shadcn 语义变量 → 映射到暗色调色板 ─────────── */
+  --background:             #0d1b2a;
+  --foreground:             #e2eaf3;
+  --card:                   #162d44;
+  --card-foreground:        #e2eaf3;
+  --popover:                #162d44;
+  --popover-foreground:     #e2eaf3;
+  --primary:                #00b4d8;
+  --primary-foreground:     #ffffff;
+  --secondary:              #112236;
+  --secondary-foreground:   #e2eaf3;
+  --muted:                  #1d3a56;
+  --muted-foreground:       #4a6880;
+  --accent:                 #1d3a56;
+  --accent-foreground:      #e2eaf3;
+  --destructive:            #ef4444;
+  --input:                  #2a5070;
+  --ring:                   #00b4d8;
+  --radius:                 0.5rem;
+
+  /* shadcn sidebar */
+  --sidebar:                    #112236;
+  --sidebar-foreground:         #e2eaf3;
+  --sidebar-primary:            #00b4d8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:             #1d3a56;
+  --sidebar-accent-foreground:  #e2eaf3;
+  --sidebar-border:             #1e3a54;
+  --sidebar-ring:               #00b4d8;
+
+  /* shadcn chart colors */
+  --chart-1: #00b4d8;
+  --chart-2: #f59e0b;
+  --chart-3: #22c55e;
+  --chart-4: #ef4444;
+  --chart-5: #7a9ab5;
+}
+
+/* ─── Base styles ───────────────────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* ─── Monospace data display ─────────────────────────────────────────────── */
+.mono {
+  font-family: 'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Chip display ───────────────────────────────────────────────────────── */
+.chip-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--amber);
+  font-weight: 600;
+}
+
+/* ─── Pulse animation (active player seat) ──────────────────────────────── */
+@keyframes pulse-border {
+  0%, 100% { border-color: var(--teal-dim); }
+  50%       { border-color: var(--teal); box-shadow: 0 0 16px var(--teal-glow); }
+}
+
+/* ─── Scrollbar styling ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--teal-dim); }
+
+/* ─── Scanline overlay (terminal/mono-industrial aesthetic) ──────────────── */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  border-radius: inherit;
+  z-index: 1;
+}
+
+/* ─── Noise texture (felt / atmospheric surfaces) ───────────────────────── */
+.noise-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  border-radius: inherit;
+}
+
+/* ─── 3D Card flip ──────────────────────────────────────────────────────── */
+.card-3d-container {
+  perspective: 800px;
+}
+.card-3d {
+  transform-style: preserve-3d;
+  position: relative;
+}
+.card-3d-face,
+.card-3d-back {
+  backface-visibility: hidden;
+}
+.card-3d-back {
+  transform: rotateY(180deg);
+  position: absolute;
+  inset: 0;
+}
+
+/* ─── Glow text ─────────────────────────────────────────────────────────── */
+.glow-text-teal {
+  text-shadow: 0 0 8px rgba(0, 180, 216, 0.5), 0 0 20px rgba(0, 180, 216, 0.2);
+}
+.glow-text-amber {
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.5), 0 0 20px rgba(245, 158, 11, 0.2);
+}
+.glow-text-win {
+  text-shadow: 0 0 8px rgba(34, 197, 94, 0.5), 0 0 20px rgba(34, 197, 94, 0.2);
+}
+
+/* ─── Edge light (depth illusion for cards/containers) ──────────────────── */
+.edge-light {
+  box-shadow:
+    inset 0 1px 0 rgba(0, 180, 216, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.edge-light-amber {
+  box-shadow:
+    inset 0 1px 0 rgba(245, 158, 11, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Blinking cursor (terminal reasoning text) ─────────────────────────── */
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.blink-cursor::after {
+  content: '█';
+  animation: blink-cursor 1s step-end infinite;
+  color: var(--teal);
+  margin-left: 2px;
+  font-size: 0.85em;
+}
+
+/* ─── Screen shake (all-in / dramatic moments) ──────────────────────────── */
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-2px, 1px); }
+  20% { transform: translate(2px, -1px); }
+  30% { transform: translate(-1px, 2px); }
+  40% { transform: translate(1px, -2px); }
+  50% { transform: translate(-2px, 0px); }
+  60% { transform: translate(2px, 1px); }
+  70% { transform: translate(0px, -1px); }
+  80% { transform: translate(-1px, 1px); }
+  90% { transform: translate(1px, 0px); }
+}
+.shake {
+  animation: screen-shake 0.4s ease-in-out;
+}
+
+/* ─── Confetti particles (win celebration) ──────────────────────────────── */
+@keyframes confetti-fall {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(60px) rotate(720deg); opacity: 0; }
+}
+.confetti-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  pointer-events: none;
+  animation: confetti-fall 1.2s ease-out forwards;
+}
+
+/* ─── Logo glow pulse ───────────────────────────────────────────────────── */
+@keyframes logo-glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(0, 180, 216, 0.2)); }
+  50% { filter: drop-shadow(0 0 10px rgba(0, 180, 216, 0.5)); }
+}
+
+/* ─── Rim shimmer (table edge iridescence) ──────────────────────────────── */
+@keyframes rim-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* ─── Reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .blink-cursor::after { animation: none; }
+  .shake { animation: none; }
+  .confetti-particle { animation: none; display: none; }
+}
+
+/* ─── Mobile overrides ──────────────────────────────────────────────────── */
+
+/* Ensure touch targets are large enough (44px minimum) */
+@media (max-width: 767px) {
+  /* Prevent zoom on input focus (iOS) */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Larger scrollbar for touch */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+
+  /* Disable hover effects on touch devices */
+  @media (hover: none) {
+    .hover\:border-teal\/40:hover { border-color: unset; }
+  }
+}
+
+/* Safe area insets for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Mobile slide-up panel */
+.mobile-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 40;
+  backdrop-filter: blur(4px);
+}
+
+.mobile-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 70vh;
+  z-index: 50;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-bright);
+  border-radius: 1rem 1rem 0 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-panel-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--text-muted);
+  border-radius: 2px;
+  margin: 8px auto;
+  opacity: 0.5;
+}
+
+/* ─── Tailwind v4 @theme — 注册自定义色彩和字体供 utility classes 使用 ──── */
+@theme inline {
+  /* 字体 */
+  --font-sans:  'Inter Variable', 'Inter', 'SF Pro Display', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-heading: var(--font-sans);
+
+  /* 项目自定义色彩 */
+  --color-bg-base:       var(--bg-base);
+  --color-bg-surface:    var(--bg-surface);
+  --color-bg-card:       var(--bg-card);
+  --color-bg-hover:      var(--bg-hover);
+
+  --color-teal:          var(--teal);
+  --color-teal-dim:      var(--teal-dim);
+  --color-teal-glow:     var(--teal-glow);
+
+  --color-amber:         var(--amber);
+  --color-amber-dim:     var(--amber-dim);
+  --color-amber-glow:    var(--amber-glow);
+
+  --color-text-primary:  var(--text-primary);
+  --color-text-secondary:var(--text-secondary);
+  --color-text-muted:    var(--text-muted);
+
+  --color-border-bright: var(--border-bright);
+
+  --color-red-card:      var(--red-card);
+  --color-black-card:    var(--black-card);
+
+  --color-win:           var(--win);
+  --color-loss:          var(--loss);
+  --color-fold:          var(--fold);
+
+  /* shadcn 语义色彩映射 */
+  --color-background:               var(--background);
+  --color-foreground:                var(--foreground);
+  --color-card:                      var(--card);
+  --color-card-foreground:           var(--card-foreground);
+  --color-popover:                   var(--popover);
+  --color-popover-foreground:        var(--popover-foreground);
+  --color-primary:                   var(--primary);
+  --color-primary-foreground:        var(--primary-foreground);
+  --color-secondary:                 var(--secondary);
+  --color-secondary-foreground:      var(--secondary-foreground);
+  --color-muted:                     var(--muted);
+  --color-muted-foreground:          var(--muted-foreground);
+  --color-accent:                    var(--accent);
+  --color-accent-foreground:         var(--accent-foreground);
+  --color-destructive:               var(--destructive);
+  --color-border:                    var(--border);
+  --color-input:                     var(--input);
+  --color-ring:                      var(--ring);
+
+  --color-sidebar:                   var(--sidebar);
+  --color-sidebar-foreground:        var(--sidebar-foreground);
+  --color-sidebar-primary:           var(--sidebar-primary);
+  --color-sidebar-primary-foreground:var(--sidebar-primary-foreground);
+  --color-sidebar-accent:            var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border:            var(--sidebar-border);
+  --color-sidebar-ring:              var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* 圆角 */
+  --radius-sm:  calc(var(--radius) * 0.6);
+  --radius-md:  calc(var(--radius) * 0.8);
+  --radius-lg:  var(--radius);
+  --radius-xl:  calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
