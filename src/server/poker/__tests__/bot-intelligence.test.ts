@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, type HandActionRecord } from '../agents';
+import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, computeExploit, type HandActionRecord } from '../agents';
 
 describe('STYLE_CONFIG intelligence fields', () => {
   const styles = Object.keys(STYLE_CONFIG_FOR_TEST) as Array<keyof typeof STYLE_CONFIG_FOR_TEST>;
@@ -147,5 +147,45 @@ describe('Multi-street memory', () => {
     expect(patterns.betBetBet).toBe(false);
     expect(patterns.checkCheckBet).toBe(false);
     expect(patterns.timesRaised).toBe(0);
+  });
+});
+
+describe('Universal opponent modeling', () => {
+  it('exploits calling station (high VPIP, low AF)', () => {
+    const result = computeExploit({
+      hands: 30, vpipRate: 0.70, pfrRate: 0.10, af: 0.4,
+      cbetRate: 0.5, foldToCbetRate: 0.2, wtsdRate: 0.45,
+    });
+    expect(result.bluffDelta).toBeLessThan(0);
+    expect(result.aggressionDelta).toBeGreaterThan(0);
+  });
+
+  it('exploits nit (low VPIP)', () => {
+    const result = computeExploit({
+      hands: 30, vpipRate: 0.15, pfrRate: 0.10, af: 1.5,
+      cbetRate: 0.7, foldToCbetRate: 0.5, wtsdRate: 0.20,
+    });
+    expect(result.bluffDelta).toBeGreaterThan(0);
+  });
+
+  it('exploits aggro player (high AF)', () => {
+    const result = computeExploit({
+      hands: 30, vpipRate: 0.40, pfrRate: 0.30, af: 3.5,
+      cbetRate: 0.8, foldToCbetRate: 0.3, wtsdRate: 0.35,
+    });
+    expect(result.slowplayDelta).toBeGreaterThan(0);
+    expect(result.checkRaiseDelta).toBeGreaterThan(0);
+  });
+
+  it('returns zero deltas with insufficient hands', () => {
+    const result = computeExploit({
+      hands: 3, vpipRate: 0.5, pfrRate: 0.5, af: 2.0,
+      cbetRate: 0.5, foldToCbetRate: 0.5, wtsdRate: 0.3,
+    });
+    expect(result.aggressionDelta).toBe(0);
+    expect(result.bluffDelta).toBe(0);
+    expect(result.callThresholdDelta).toBe(0);
+    expect(result.slowplayDelta).toBe(0);
+    expect(result.checkRaiseDelta).toBe(0);
   });
 });

@@ -284,6 +284,84 @@ interface OpponentStats {
   pfr: number;          // preflop raise count
   aggActions: number;   // raise/bet count postflop
   passActions: number;  // check/call count postflop
+  cbetOpportunities: number;
+  cbets: number;
+  foldToCbetCount: number;
+  foldToCbetOpportunities: number;
+  wtsdCount: number;
+  wtsdOpportunities: number;
+}
+
+export interface OpponentProfile {
+  hands: number;
+  vpipRate: number;
+  pfrRate: number;
+  af: number;
+  cbetRate: number;
+  foldToCbetRate: number;
+  wtsdRate: number;
+}
+
+export interface ExploitDeltas {
+  aggressionDelta: number;
+  bluffDelta: number;
+  callThresholdDelta: number;
+  slowplayDelta: number;
+  checkRaiseDelta: number;
+}
+
+export function computeExploit(opp: OpponentProfile): ExploitDeltas {
+  if (opp.hands < 8) {
+    return { aggressionDelta: 0, bluffDelta: 0, callThresholdDelta: 0, slowplayDelta: 0, checkRaiseDelta: 0 };
+  }
+
+  let aggressionDelta = 0;
+  let bluffDelta = 0;
+  let callThresholdDelta = 0;
+  let slowplayDelta = 0;
+  let checkRaiseDelta = 0;
+
+  // vs calling station (high VPIP, low AF): value bet thinner, don't bluff
+  if (opp.vpipRate > 0.55 && opp.af < 0.8) {
+    aggressionDelta += 0.12;
+    bluffDelta -= 0.06;
+  }
+
+  // vs nit (low VPIP): steal more
+  if (opp.vpipRate < 0.25) {
+    bluffDelta += 0.08;
+    aggressionDelta += 0.06;
+  }
+
+  // vs passive (low AF): bluff more
+  if (opp.af < 0.8 && opp.vpipRate <= 0.55) {
+    bluffDelta += 0.05;
+  }
+
+  // vs aggro (high AF): trap more
+  if (opp.af > 2.5) {
+    slowplayDelta += 0.12;
+    checkRaiseDelta += 0.10;
+  }
+
+  // vs high fold-to-cbet: c-bet relentlessly
+  if (opp.foldToCbetRate > 0.6) {
+    aggressionDelta += 0.08;
+    bluffDelta += 0.04;
+  }
+
+  // vs low fold-to-cbet: only value bet
+  if (opp.foldToCbetRate < 0.3 && opp.foldToCbetRate > 0) {
+    bluffDelta -= 0.04;
+  }
+
+  // vs high WTSD: value bet thinner, don't bluff
+  if (opp.wtsdRate > 0.35) {
+    aggressionDelta += 0.06;
+    bluffDelta -= 0.04;
+  }
+
+  return { aggressionDelta, bluffDelta, callThresholdDelta, slowplayDelta, checkRaiseDelta };
 }
 
 // ─── Position awareness ──────────────────────────────────────────────────────
@@ -377,7 +455,7 @@ export class BuiltinBotAgent implements PlayerAgent {
         // Ensure stats exist for all opponents
         for (const p of msg.players) {
           if (p.seat !== this.mySeat && !this.opponentStats.has(p.seat)) {
-            this.opponentStats.set(p.seat, { hands: 0, vpip: 0, pfr: 0, aggActions: 0, passActions: 0 });
+            this.opponentStats.set(p.seat, { hands: 0, vpip: 0, pfr: 0, aggActions: 0, passActions: 0, cbetOpportunities: 0, cbets: 0, foldToCbetCount: 0, foldToCbetOpportunities: 0, wtsdCount: 0, wtsdOpportunities: 0 });
           }
         }
         // Increment hand count for all opponents
@@ -484,34 +562,16 @@ export class BuiltinBotAgent implements PlayerAgent {
       }
     }
 
-    // ─── Adaptive (曹操): adjust based on opponent tendencies ────────────
-    if (style === 'adaptive') {
-      const opp = this.getAverageOpponentProfile();
-      if (opp.hands >= 5) {
-        // vs tight opponents (low VPIP): steal more
-        if (opp.vpipRate < 0.3) {
-          cfg.looseness = clamp01(cfg.looseness + 0.15);
-          cfg.bluffRate = clamp01(cfg.bluffRate + 0.08);
-          extraReasoning = ` 对手偏紧(VPIP ${Math.round(opp.vpipRate * 100)}%), 加偷.`;
-        }
-        // vs loose opponents: tighten up and value-bet thinner
-        else if (opp.vpipRate > 0.55) {
-          cfg.looseness = clamp01(cfg.looseness - 0.10);
-          cfg.aggression = clamp01(cfg.aggression + 0.12);
-          extraReasoning = ` 对手偏松(VPIP ${Math.round(opp.vpipRate * 100)}%), 价值下注.`;
-        }
-        // vs passive opponents: bluff more
-        if (opp.af < 0.8) {
-          cfg.bluffRate = clamp01(cfg.bluffRate + 0.06);
-          cfg.raiseBias = clamp01(cfg.raiseBias + 0.08);
-          if (!extraReasoning) extraReasoning = ` 对手被动(AF ${opp.af.toFixed(1)}), 多施压.`;
-        }
-        // vs aggressive opponents: trap more
-        else if (opp.af > 2.5) {
-          cfg.slowplayRate = clamp01(cfg.slowplayRate + 0.15);
-          cfg.checkRaiseRate = clamp01(cfg.checkRaiseRate + 0.12);
-          if (!extraReasoning) extraReasoning = ` 对手凶(AF ${opp.af.toFixed(1)}), 设陷阱.`;
-        }
+    // ─── Universal opponent modeling (all styles, scaled by exploitWeight) ─
+    const oppProfile = this.getAverageOpponentProfile();
+    if (oppProfile.hands >= 8) {
+      const exploit = computeExploit(oppProfile);
+      cfg.aggression = clamp01(cfg.aggression + exploit.aggressionDelta * cfg.exploitWeight);
+      cfg.bluffRate = clamp01(cfg.bluffRate + exploit.bluffDelta * cfg.exploitWeight);
+      cfg.slowplayRate = clamp01(cfg.slowplayRate + exploit.slowplayDelta * cfg.exploitWeight);
+      cfg.checkRaiseRate = clamp01(cfg.checkRaiseRate + exploit.checkRaiseDelta * cfg.exploitWeight);
+      if (!extraReasoning) {
+        extraReasoning = ` 对手画像(VPIP ${Math.round(oppProfile.vpipRate * 100)}% AF ${oppProfile.af.toFixed(1)}).`;
       }
     }
 
@@ -573,8 +633,10 @@ export class BuiltinBotAgent implements PlayerAgent {
   }
 
   /** Compute average opponent VPIP rate and aggression factor. */
-  private getAverageOpponentProfile(): { hands: number; vpipRate: number; pfrRate: number; af: number } {
+  private getAverageOpponentProfile(): OpponentProfile {
     let totalHands = 0, totalVpip = 0, totalPfr = 0, totalAgg = 0, totalPass = 0;
+    let totalCbetOpp = 0, totalCbets = 0, totalFoldCbetOpp = 0, totalFoldCbet = 0;
+    let totalWtsdOpp = 0, totalWtsd = 0;
     for (const [seat, s] of this.opponentStats) {
       if (seat === this.mySeat || s.hands < 3) continue;
       totalHands += s.hands;
@@ -582,13 +644,24 @@ export class BuiltinBotAgent implements PlayerAgent {
       totalPfr += s.pfr;
       totalAgg += s.aggActions;
       totalPass += s.passActions;
+      totalCbetOpp += s.cbetOpportunities;
+      totalCbets += s.cbets;
+      totalFoldCbetOpp += s.foldToCbetOpportunities;
+      totalFoldCbet += s.foldToCbetCount;
+      totalWtsdOpp += s.wtsdOpportunities;
+      totalWtsd += s.wtsdCount;
     }
-    if (totalHands === 0) return { hands: 0, vpipRate: 0.4, pfrRate: 0.2, af: 1.5 };
+    if (totalHands === 0) {
+      return { hands: 0, vpipRate: 0.4, pfrRate: 0.2, af: 1.5, cbetRate: 0.5, foldToCbetRate: 0.4, wtsdRate: 0.3 };
+    }
     return {
       hands: totalHands,
       vpipRate: totalVpip / totalHands,
       pfrRate: totalPfr / totalHands,
       af: totalPass > 0 ? totalAgg / totalPass : totalAgg > 0 ? 3 : 1,
+      cbetRate: totalCbetOpp > 0 ? totalCbets / totalCbetOpp : 0.5,
+      foldToCbetRate: totalFoldCbetOpp > 0 ? totalFoldCbet / totalFoldCbetOpp : 0.4,
+      wtsdRate: totalWtsdOpp > 0 ? totalWtsd / totalWtsdOpp : 0.3,
     };
   }
 
