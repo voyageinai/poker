@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { withBasePath } from '@/lib/runtime-config';
 import type { Card as CardType } from '@/lib/types';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ export default function RecordsPage() {
   }, [router]);
 
   return (
-    <div className="py-6">
+    <div className="py-4 md:py-6">
       <h1 className="mb-5 text-xl font-bold text-text-primary">
         <span className="glow-text-teal">战</span>绩
       </h1>
@@ -138,6 +139,7 @@ export default function RecordsPage() {
 // ─── Hands Tab ───────────────────────────────────────────────────────────────
 
 function HandsTab() {
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState<UserHandRow[]>([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<PlayerStats | null>(null);
@@ -209,31 +211,55 @@ function HandsTab() {
                   )}
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-text-primary">第 {r.hand_number} 局</span>
-                    <span className="text-xs text-text-muted truncate">{r.table_name}</span>
+                {isMobile ? (
+                  /* Mobile: two-line layout */
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-text-primary">第 {r.hand_number} 局</span>
+                      <span className="text-xs text-text-muted truncate flex-1">{r.table_name}</span>
+                      {profit !== null && (
+                        <span className={cn(
+                          'mono text-sm font-bold whitespace-nowrap shrink-0',
+                          profit > 0 ? 'text-win' : profit < 0 ? 'text-loss' : 'text-text-muted',
+                        )}>
+                          {profit > 0 ? '+' : ''}{profit.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="text-xs text-text-muted">
+                        底池 <span className="mono text-amber">{r.pot}</span>
+                      </span>
+                      <span className="text-xs text-text-muted whitespace-nowrap">
+                        {r.ended_at ? fmtTime(r.ended_at) : ''}
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-0.5 text-xs text-text-muted">
-                    底池 <span className="mono text-amber">{r.pot}</span>
-                  </div>
-                </div>
-
-                {/* Profit */}
-                {profit !== null && (
-                  <span className={cn(
-                    'mono text-sm font-bold whitespace-nowrap',
-                    profit > 0 ? 'text-win' : profit < 0 ? 'text-loss' : 'text-text-muted',
-                  )}>
-                    {profit > 0 ? '+' : ''}{profit.toLocaleString()}
-                  </span>
+                ) : (
+                  /* Desktop: single-line layout */
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-text-primary">第 {r.hand_number} 局</span>
+                        <span className="text-xs text-text-muted truncate">{r.table_name}</span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-text-muted">
+                        底池 <span className="mono text-amber">{r.pot}</span>
+                      </div>
+                    </div>
+                    {profit !== null && (
+                      <span className={cn(
+                        'mono text-sm font-bold whitespace-nowrap',
+                        profit > 0 ? 'text-win' : profit < 0 ? 'text-loss' : 'text-text-muted',
+                      )}>
+                        {profit > 0 ? '+' : ''}{profit.toLocaleString()}
+                      </span>
+                    )}
+                    <span className="text-xs text-text-muted whitespace-nowrap">
+                      {r.ended_at ? fmtTime(r.ended_at) : ''}
+                    </span>
+                  </>
                 )}
-
-                {/* Time */}
-                <span className="text-xs text-text-muted whitespace-nowrap">
-                  {r.ended_at ? fmtTime(r.ended_at) : ''}
-                </span>
               </Link>
             );
           })}
@@ -327,11 +353,11 @@ function LedgerTab() {
 function Pagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
   return (
     <div className="mt-4 flex items-center justify-center gap-2">
-      <Button variant="ghost" size="xs" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+      <Button variant="ghost" size="xs" disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="h-11 px-4 md:h-auto md:px-2">
         上一页
       </Button>
       <span className="text-xs text-text-muted">{page} / {totalPages}</span>
-      <Button variant="ghost" size="xs" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+      <Button variant="ghost" size="xs" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="h-11 px-4 md:h-auto md:px-2">
         下一页
       </Button>
     </div>
