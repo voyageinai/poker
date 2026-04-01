@@ -83,7 +83,7 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
                 key={label}
                 variant="ghost"
                 size="xs"
-                className="flex-1 text-[0.65rem] h-7 active:translate-y-px active:brightness-90"
+                className="flex-1 text-[0.65rem] h-9 active:translate-y-px active:brightness-90"
                 onClick={() => {
                   const raiseSize = Math.round(pot * mult);
                   const raiseTo = currentBet + raiseSize;

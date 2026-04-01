@@ -45,8 +45,8 @@ export function getMobileSeatPosition(
   totalOpponents: number,
 ): { x: number; y: number } {
   const angle = Math.PI + ((opponentIndex + 1) / (totalOpponents + 1)) * Math.PI;
-  const rx = 42;
-  const ry = 40;
+  const rx = 40; // safe on 375px screens (min x ≈ 12%)
+  const ry = 38;
   return {
     x: 50 + rx * Math.cos(angle),
     y: 50 + ry * Math.sin(angle),
