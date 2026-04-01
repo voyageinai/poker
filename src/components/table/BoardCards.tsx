@@ -21,7 +21,7 @@ export default function BoardCards({ cards, compact }: BoardCardsProps) {
     return 0;
   }
 
-  const cardSize = compact ? 'md' as const : 'lg' as const;
+  const cardSize = compact ? 'sm' as const : 'lg' as const;
 
   return (
     <div className={`relative flex items-center justify-center ${compact ? 'gap-1' : 'gap-2'}`}>
