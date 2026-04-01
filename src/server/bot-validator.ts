@@ -91,8 +91,8 @@ export async function validateBot(binaryPath: string): Promise<ValidationResult>
       seat: 0,
       stack: 1000,
       players: [
-        { seat: 0, displayName: 'probe', stack: 1000 },
-        { seat: 1, displayName: 'opponent', stack: 1000 },
+        { seat: 0, displayName: 'probe', stack: 1000, isBot: true },
+        { seat: 1, displayName: 'opponent', stack: 1000, isBot: true },
       ],
       smallBlind: 10,
       bigBlind: 20,

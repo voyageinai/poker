@@ -14,7 +14,7 @@ describe('STYLE_CONFIG intelligence fields', () => {
   for (const field of ['positionSensitivity', 'sizingSensitivity', 'patternSensitivity', 'exploitWeight'] as const) {
     it(`every style has ${field} between 0 and 1`, () => {
       for (const style of styles) {
-        const value = (STYLE_CONFIG_FOR_TEST[style] as Record<string, unknown>)[field];
+        const value = (STYLE_CONFIG_FOR_TEST[style] as unknown as Record<string, unknown>)[field];
         expect(value, `${style}.${field}`).toBeTypeOf('number');
         expect(value as number, `${style}.${field} >= 0`).toBeGreaterThanOrEqual(0);
         expect(value as number, `${style}.${field} <= 1`).toBeLessThanOrEqual(1);
