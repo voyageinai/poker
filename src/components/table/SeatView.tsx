@@ -145,11 +145,11 @@ export default function SeatView({
         </div>
       </div>
 
-      {/* Health bar — hero only, desktop only */}
-      {isMe && !compact && (
+      {/* Health bar — hero only */}
+      {isMe && (
         <div
           className="w-full rounded-full overflow-hidden"
-          style={{ height: 3, background: 'rgba(255,255,255,0.08)' }}
+          style={{ height: compact ? 2 : 3, background: 'rgba(255,255,255,0.08)' }}
         >
           <div
             style={{
@@ -197,12 +197,12 @@ export default function SeatView({
         {/* On mobile compact, show single-letter action */}
         {player.lastAction && compact && (
           <span
-            className="text-[0.4rem] px-0.5 rounded-[2px] font-bold leading-tight"
+            className="text-[0.55rem] px-0.5 rounded-[2px] font-bold leading-tight"
             style={{
               color: actionColors[player.lastAction] ?? 'var(--text-muted)',
             }}
           >
-            {player.lastAction === 'fold' ? 'F' : player.lastAction === 'check' ? 'K' : player.lastAction === 'call' ? 'C' : player.lastAction === 'raise' ? 'R' : player.lastAction === 'allin' ? 'A' : ''}
+            {player.lastAction === 'fold' ? '弃' : player.lastAction === 'check' ? '过' : player.lastAction === 'call' ? '跟' : player.lastAction === 'raise' ? '加' : player.lastAction === 'allin' ? '全' : ''}
           </span>
         )}
       </div>

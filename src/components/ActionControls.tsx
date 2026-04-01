@@ -55,7 +55,7 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
   // ─── Mobile compact layout: stacked vertically ──────────────────────────────
   if (compact) {
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         {/* Timer bar */}
         <TimerBar pct={pct} urgent={urgent} remaining={remaining} />
 
@@ -68,7 +68,7 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
               max={maxRaiseTotal > minRaiseTotal ? maxRaiseTotal : minRaiseTotal}
               value={raiseAmount}
               onChange={e => setRaiseAmount(Number(e.target.value))}
-              className="flex-1 appearance-none accent-amber cursor-pointer h-6"
+              className="mobile-slider flex-1 appearance-none accent-amber cursor-pointer h-8"
               style={{ touchAction: 'none' }}
             />
             <span className="mono text-sm font-bold text-amber min-w-[48px] text-right">{raiseAmount}</span>
@@ -77,13 +77,13 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
 
         {/* Quick-bet presets */}
         {canShowSlider && (
-          <div className="flex gap-1">
+          <div className="flex gap-1.5">
             {QUICK_BETS.map(({ label, mult }) => (
               <Button
                 key={label}
                 variant="ghost"
                 size="xs"
-                className="flex-1 text-[0.65rem] h-7 active:translate-y-px active:brightness-90"
+                className="flex-1 text-xs h-9 active:translate-y-px active:brightness-90"
                 onClick={() => {
                   const raiseSize = Math.round(pot * mult);
                   const raiseTo = currentBet + raiseSize;

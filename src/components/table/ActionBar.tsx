@@ -51,7 +51,7 @@ export default function ActionBar({
 
   return (
     <motion.div
-      animate={{ height: compact ? (expanded ? 156 : 44) : (expanded ? 120 : 48) }}
+      animate={{ height: compact ? (expanded ? 176 : 44) : (expanded ? 120 : 48) }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
       className={`shrink-0 overflow-hidden border-t border-[var(--border)] bg-bg-surface safe-bottom ${
         compact ? 'px-2 rounded-none' : 'px-3 rounded-b-lg'

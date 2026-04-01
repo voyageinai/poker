@@ -176,9 +176,9 @@ export default function TablePage() {
             compact
           />
 
-          {/* Showdown overlay on mobile */}
+          {/* Showdown overlay on mobile — positioned above ActionBar */}
           {showdown && (
-            <div className="absolute bottom-1 left-2 right-2 z-10">
+            <div className="absolute bottom-12 left-2 right-2 z-10">
               <ShowdownPanel
                 showdown={showdown}
                 winnerSeats={winnerSeats}

@@ -96,9 +96,9 @@ function MobileAuthArea({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuO
       <span className="mono text-[0.8rem] font-semibold text-amber">{user.chips.toLocaleString()}</span>
       <button
         onClick={() => setMenuOpen(!menuOpen)}
-        className="flex h-8 w-8 items-center justify-center rounded border-none bg-transparent text-text-primary"
+        className="flex h-9 w-9 items-center justify-center rounded border-none bg-transparent text-text-primary"
       >
-        {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
       <AnimatePresence>
@@ -110,8 +110,8 @@ function MobileAuthArea({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuO
             transition={{ duration: 0.15 }}
             className="fixed left-0 right-0 top-11 z-50 border-b border-[var(--border)] bg-bg-surface px-4 py-3"
           >
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between py-1">
                 <span className="text-sm font-medium text-text-primary">{user.username}</span>
                 {user.role === 'admin' && (
                   <Link href="/admin" className="text-xs text-amber no-underline" onClick={() => setMenuOpen(false)}>
@@ -123,7 +123,7 @@ function MobileAuthArea({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuO
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full justify-start text-text-muted"
+                className="w-full justify-start text-text-muted h-11"
                 onClick={async () => {
                   await fetch(withBasePath('/api/auth/logout'), { method: 'POST' });
                   window.location.href = withBasePath('/');

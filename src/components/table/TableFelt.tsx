@@ -190,15 +190,15 @@ export default function TableFelt({
             <span
               className={`mono text-amber font-bold bg-black/50 rounded-[0.25rem] inline-flex items-center gap-[0.2rem] ${
                 compact
-                  ? 'text-[0.55rem] px-[0.25rem] py-[0.1rem]'
+                  ? 'text-[0.7rem] px-[0.3rem] py-[0.1rem]'
                   : 'text-[0.75rem] px-[0.4rem] py-[0.15rem]'
               }`}
             >
               <span
                 style={{
                   display: 'inline-block',
-                  width: compact ? 6 : 10,
-                  height: compact ? 6 : 10,
+                  width: compact ? 8 : 10,
+                  height: compact ? 8 : 10,
                   borderRadius: '50%',
                   background: 'radial-gradient(circle at 35% 35%, #f5d080, #b8860b)',
                   flexShrink: 0,

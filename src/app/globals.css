@@ -335,6 +335,47 @@ html, body {
   opacity: 0.5;
 }
 
+/* ─── Mobile slider (larger touch target) ──────────────────────────────── */
+.mobile-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--amber);
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--amber);
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-card);
+}
+
+.mobile-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-card);
+}
+
+/* Safe area insets for landscape notched phones */
+@supports (padding: env(safe-area-inset-left)) {
+  .safe-left { padding-left: env(safe-area-inset-left); }
+  .safe-right { padding-right: env(safe-area-inset-right); }
+}
+
 /* ─── Tailwind v4 @theme — 注册自定义色彩和字体供 utility classes 使用 ──── */
 @theme inline {
   /* 字体 */

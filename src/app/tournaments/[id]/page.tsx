@@ -89,7 +89,7 @@ export default function TournamentDetailPage() {
   const slotsRemaining = data.max_players - data.entries.length;
 
   return (
-    <div className="py-8 max-w-[800px] mx-auto">
+    <div className="py-5 md:py-8 max-w-[800px] mx-auto">
       <Link href="/tournaments" className="text-text-muted text-[0.85rem] no-underline hover:text-text-secondary">
         <ArrowLeft className="inline h-4 w-4" /> 锦标赛
       </Link>
@@ -97,7 +97,7 @@ export default function TournamentDetailPage() {
       <h1 className="mt-2 mb-1 text-2xl font-bold tracking-tight">
         {data.name}
       </h1>
-      <div className="flex gap-6 mb-6 text-[0.85rem] text-text-secondary">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 md:gap-6 mb-6 text-[0.85rem] text-text-secondary">
         <span>买入: <span className="chip-count mono">{data.buyin}</span></span>
         <span>初始筹码: <span className="mono">{data.starting_chips}</span></span>
         <span>{data.max_players}人桌</span>
@@ -119,8 +119,8 @@ export default function TournamentDetailPage() {
               报名（剩余 {slotsRemaining} 个名额）
             </div>
 
-            <div className="flex gap-3 items-end flex-wrap">
-              <Button variant="teal" onClick={() => handleRegister(true)} disabled={registering}>
+            <div className="flex flex-col md:flex-row gap-3 md:items-end">
+              <Button variant="teal" onClick={() => handleRegister(true)} disabled={registering} className="h-11 md:h-auto">
                 以玩家身份报名
               </Button>
 
@@ -174,6 +174,7 @@ export default function TournamentDetailPage() {
             暂无参赛者
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-[var(--border)]">
@@ -210,6 +211,7 @@ export default function TournamentDetailPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -218,6 +220,7 @@ export default function TournamentDetailPage() {
         <div className="px-4 py-2.5 border-b border-[var(--border)] font-semibold text-[0.85rem]">
           盲注级别
         </div>
+        <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-[var(--border)]">
@@ -250,6 +253,7 @@ export default function TournamentDetailPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
