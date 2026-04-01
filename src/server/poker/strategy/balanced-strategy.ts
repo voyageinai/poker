@@ -74,7 +74,10 @@ export function chooseBalancedAction(
   texture: BoardTexture | null,
   playerCount: number,
 ): BalancedDecision {
-  const { street, pot, toCall, minRaise, stack } = req
+  const { street, pot, toCall, stack } = req
+  // Raise cap sentinel: MAX_SAFE_INTEGER signals "no more raises allowed"
+  const raiseCapped = req.minRaise > stack * 2
+  const minRaise = raiseCapped ? stack : req.minRaise
 
   // Step 1: Compute SPR
   const spr = stack / Math.max(pot, 1)
@@ -102,7 +105,12 @@ export function chooseBalancedAction(
   // Step 5: Compute frequencies
   let frequencies: ActionFrequencies
 
-  if (toCall === 0) {
+  if (raiseCapped) {
+    // Raise cap reached — redistribute raise freq into call/check
+    frequencies = toCall > 0
+      ? { fold: Math.max(0, 1 - strength), call: Math.min(1, strength), raise: 0 }
+      : { fold: 0, call: 1, raise: 0 }
+  } else if (toCall === 0) {
     frequencies = computeNoFacingBetFrequencies(strength, pot, betFraction)
   } else {
     frequencies = computeFacingBetFrequencies(strength, pot, toCall)

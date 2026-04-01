@@ -5,6 +5,7 @@
  * Replaces the inline postflopStrengthMC in agents.ts.
  */
 import { monteCarloEquity } from '@/server/poker/hand-eval'
+import type { Card } from '@/lib/types'
 
 // ─── Draw detection ────────────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ export function postflopStrengthMC(
     // doesn't deal them again as board cards
     const dead = batchHands.slice(1).flat()
 
-    const { equities } = monteCarloEquity(batchHands, board, dead, batchSize)
+    const { equities } = monteCarloEquity(batchHands as Array<[Card, Card]>, board as Card[], dead as Card[], batchSize)
     totalEquity += equities[0]
   }
 

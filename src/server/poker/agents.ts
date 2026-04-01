@@ -379,7 +379,7 @@ export function computeExploit(opp: OpponentProfile): ExploitDeltas {
 
 // ─── Position awareness ──────────────────────────────────────────────────────
 
-export type Position = 'EP' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
+export type Position = 'UTG' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
 
 export function calcPosition(mySeat: number, buttonSeat: number, seatList: number[]): Position {
   const n = seatList.length;
@@ -409,7 +409,7 @@ export function calcPosition(mySeat: number, buttonSeat: number, seatList: numbe
   if (middleCount <= 0) return 'MP';
   const epCount = Math.ceil(middleCount / 2);
   const posInMiddle = myIdx - 3;
-  return posInMiddle < epCount ? 'EP' : 'MP';
+  return posInMiddle < epCount ? 'UTG' : 'MP';
 }
 
 export function getPositionFactor(position: Position): number {
@@ -417,7 +417,7 @@ export function getPositionFactor(position: Position): number {
     case 'BTN': return 0.08;
     case 'CO':  return 0.06;
     case 'MP':  return 0;
-    case 'EP':  return -0.06;
+    case 'UTG': return -0.06;
     case 'SB':  return -0.06;
     case 'BB':  return -0.02;
   }
@@ -959,7 +959,9 @@ function chooseBuiltinAction(
   const sizedCallThreshold = callThreshold * lerp(1.0, sizingMult, cfg.sizingSensitivity);
   const sizedRaiseThreshold = raiseThreshold * lerp(1.0, sizingMult, cfg.sizingSensitivity);
 
-  const minRaiseTotal = req.currentBet + req.minRaise;
+  // Raise cap sentinel: MAX_SAFE_INTEGER signals "no more raises allowed"
+  const effectiveMinRaise = req.minRaise > req.stack * 2 ? req.stack : req.minRaise;
+  const minRaiseTotal = req.currentBet + effectiveMinRaise;
   const maxRaiseTotal = req.currentBet + req.stack - req.toCall;
   const canRaise = req.stack > req.toCall && minRaiseTotal <= maxRaiseTotal;
 
@@ -1034,7 +1036,9 @@ function chooseRaiseAction(
 ): PokerAction {
   if (req.stack <= req.toCall) return { action: 'allin' };
 
-  const minRaiseTotal = req.currentBet + req.minRaise;
+  // Raise cap sentinel: MAX_SAFE_INTEGER signals "no more raises allowed"
+  const effectiveMinRaise = req.minRaise > req.stack * 2 ? req.stack : req.minRaise;
+  const minRaiseTotal = req.currentBet + effectiveMinRaise;
   const maxRaiseTotal = req.currentBet + req.stack - req.toCall;
   if (maxRaiseTotal <= minRaiseTotal) return { action: 'allin' };
 
@@ -1046,7 +1050,7 @@ function chooseRaiseAction(
   const streetsLeft = req.street === 'preflop' ? 4 : req.street === 'flop' ? 3 : req.street === 'turn' ? 2 : 1;
   const isBluff = strength < 0.35;
   const legalConstraints: LegalConstraints = {
-    minRaise: req.minRaise,
+    minRaise: effectiveMinRaise,
     currentBet: req.currentBet,
   };
   const sizing = chooseBetSize(req.pot, req.stack, streetsLeft, texture ?? null, strength, style, isBluff, legalConstraints);
@@ -1064,7 +1068,7 @@ function chooseRaiseAction(
     const chipsInPot = rInitStack - req.stack;
     const wouldCommit = chipsInPot + (raiseTotal - req.currentBet + req.toCall);
     if (wouldCommit > maxPreflop) {
-      const capped = req.currentBet + Math.max(maxPreflop - chipsInPot - req.toCall, req.minRaise);
+      const capped = req.currentBet + Math.max(maxPreflop - chipsInPot - req.toCall, effectiveMinRaise);
       raiseTotal = clampInt(capped, minRaiseTotal, maxRaiseTotal);
     }
   }
@@ -1185,7 +1189,8 @@ function chooseGtoAction(
   const roll_ = Math.random();
   let result: PokerAction;
 
-  const minRaiseTotal = req.currentBet + req.minRaise;
+  const effectiveMinRaise_ = req.minRaise > req.stack * 2 ? req.stack : req.minRaise;
+  const minRaiseTotal = req.currentBet + effectiveMinRaise_;
   const maxRaiseTotal = req.currentBet + req.stack - req.toCall;
   const canRaise = req.stack > req.toCall && minRaiseTotal <= maxRaiseTotal;
 
