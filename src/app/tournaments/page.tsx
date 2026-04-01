@@ -61,7 +61,7 @@ export default function TournamentsPage() {
   }
 
   return (
-    <div className="py-5 md:py-8">
+    <div className="py-4 md:py-8">
       <div className="flex items-center justify-between mb-6 md:mb-8">
         <div>
           <h1 className="m-0 text-xl md:text-2xl font-bold tracking-tight text-text-primary">锦标赛</h1>
@@ -91,6 +91,7 @@ export default function TournamentsPage() {
                 <label className="block mb-1 text-xs text-text-muted">买入</label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   value={form.buyin}
                   onChange={e => setForm({ ...form, buyin: Number(e.target.value) })}
                   min={0}
@@ -100,6 +101,7 @@ export default function TournamentsPage() {
                 <label className="block mb-1 text-xs text-text-muted">初始筹码</label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   value={form.startingChips}
                   onChange={e => setForm({ ...form, startingChips: Number(e.target.value) })}
                   min={100}
@@ -110,7 +112,7 @@ export default function TournamentsPage() {
                 <select
                   value={form.maxPlayers}
                   onChange={e => setForm({ ...form, maxPlayers: Number(e.target.value) })}
-                  className="w-full rounded-md border border-input bg-bg-base px-3 py-2 text-sm text-text-primary outline-none"
+                  className="w-full rounded-md border border-input bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus:ring-1 focus:ring-teal/50"
                 >
                   {[2, 3, 4, 5, 6, 8, 9].map(n => <option key={n} value={n}>{n}人桌</option>)}
                 </select>

@@ -74,7 +74,7 @@ export default function LobbyPage() {
   }
 
   return (
-    <div className="py-5 md:py-8">
+    <div className="py-4 md:py-8">
       {/* Header with balance */}
       <div className="mb-5 md:mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
