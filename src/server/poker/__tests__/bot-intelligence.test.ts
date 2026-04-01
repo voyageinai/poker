@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, computeExploit, type HandActionRecord } from '../agents';
+import { postflopStrengthMC } from '../agents';
+import type { Card } from '@/lib/types';
 
 describe('STYLE_CONFIG intelligence fields', () => {
   const styles = Object.keys(STYLE_CONFIG_FOR_TEST) as Array<keyof typeof STYLE_CONFIG_FOR_TEST>;
@@ -187,5 +189,37 @@ describe('Universal opponent modeling', () => {
     expect(result.callThresholdDelta).toBe(0);
     expect(result.slowplayDelta).toBe(0);
     expect(result.checkRaiseDelta).toBe(0);
+  });
+});
+
+describe('Monte Carlo postflop equity', () => {
+  it('pocket aces on low board has high equity', () => {
+    const holeCards: [Card, Card] = ['Ah', 'As'];
+    const board: Card[] = ['2c', '7d', '4h'];
+    const eq = postflopStrengthMC(holeCards, board, 1);
+    expect(eq).toBeGreaterThan(0.75);
+  });
+
+  it('72o on AKQ board has low equity', () => {
+    const holeCards: [Card, Card] = ['7h', '2d'];
+    const board: Card[] = ['Ac', 'Kd', 'Qh'];
+    const eq = postflopStrengthMC(holeCards, board, 1);
+    expect(eq).toBeLessThan(0.30);
+  });
+
+  it('equity decreases with more opponents', () => {
+    const holeCards: [Card, Card] = ['Jh', 'Ts'];
+    const board: Card[] = ['9c', '3d', '2h'];
+    const eq1 = postflopStrengthMC(holeCards, board, 1);
+    const eq3 = postflopStrengthMC(holeCards, board, 3);
+    expect(eq1).toBeGreaterThan(eq3);
+  });
+
+  it('returns value between 0 and 1', () => {
+    const holeCards: [Card, Card] = ['5h', '5d'];
+    const board: Card[] = ['Tc', '8d', '3h', 'Js'];
+    const eq = postflopStrengthMC(holeCards, board, 2);
+    expect(eq).toBeGreaterThanOrEqual(0);
+    expect(eq).toBeLessThanOrEqual(1);
   });
 });

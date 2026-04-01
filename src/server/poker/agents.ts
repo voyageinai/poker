@@ -9,6 +9,8 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as readline from 'readline';
 import type { PokerAction, PbpServerMessage, PbpBotMessage, BotDebugInfo, Card, ActionType } from '@/lib/types';
 import { evaluateHand } from './hand-eval';
+import { Hand } from 'pokersolver';
+import { freshDeck } from './deck';
 import { getSystemBotByBinaryPath, type SystemBotDefinition, type SystemBotStyle } from '@/lib/system-bots';
 
 const BOT_ACTION_TIMEOUT_MS = parseInt(process.env.BOT_ACTION_TIMEOUT_MS ?? '5000', 10);
@@ -595,7 +597,7 @@ export class BuiltinBotAgent implements PlayerAgent {
     const opponents = Math.max(1, this.players.length - 1);
     const strength = req.street === 'preflop'
       ? preflopStrength(this.holeCards)
-      : postflopStrength(this.holeCards, req.board);
+      : postflopStrengthMC(this.holeCards, req.board, opponents);
     const crowdPenalty = Math.max(0, opponents - 2) * 0.04 * cfg.crowdSensitivity;
     const posFactor = getPositionFactor(this.myPosition) * cfg.positionSensitivity;
     const isLatePosition = this.myPosition === 'BTN' || this.myPosition === 'CO';
@@ -986,6 +988,74 @@ function postflopStrength(holeCards: [Card, Card], board: Card[]): number {
   score += flushDrawBonus(holeCards, board);
   score += straightDrawBonus(holeCards, board);
   return clamp01(score);
+}
+
+/**
+ * Monte Carlo postflop equity estimation.
+ * Simulates against `opponents` random hands, completing the board randomly.
+ * Includes draw bonus smoothing for flush/straight draws.
+ */
+export function postflopStrengthMC(
+  holeCards: [Card, Card],
+  board: Card[],
+  opponents: number,
+): number {
+  const iterations = Math.max(500, Math.round(1500 / Math.max(opponents, 1)));
+  const usedCards = new Set<Card>([...holeCards, ...board]);
+  const remaining = freshDeck().filter(c => !usedCards.has(c));
+
+  let wins = 0;
+  let ties = 0;
+
+  for (let i = 0; i < iterations; i++) {
+    // Fisher-Yates partial shuffle
+    const deck = [...remaining];
+    const needed = opponents * 2 + (5 - board.length);
+    for (let j = 0; j < needed && j < deck.length; j++) {
+      const idx = j + Math.floor(Math.random() * (deck.length - j));
+      [deck[j], deck[idx]] = [deck[idx], deck[j]];
+    }
+
+    // Deal opponent hands
+    let di = 0;
+    const oppHands: Array<[Card, Card]> = [];
+    for (let o = 0; o < opponents; o++) {
+      oppHands.push([deck[di++], deck[di++]]);
+    }
+
+    // Complete the board
+    const simBoard = [...board];
+    while (simBoard.length < 5) {
+      simBoard.push(deck[di++]);
+    }
+
+    // Evaluate hands
+    const myHand = Hand.solve([...holeCards, ...simBoard]);
+    const oppSolved = oppHands.map(h => Hand.solve([...h, ...simBoard]));
+
+    // Check if we win against all opponents
+    let iWin = true;
+    let isTie = false;
+    for (const oh of oppSolved) {
+      const winners = Hand.winners([myHand, oh]);
+      if (winners.length === 2) {
+        isTie = true;
+      } else if (winners[0] !== myHand) {
+        iWin = false;
+        break;
+      }
+    }
+    if (iWin && !isTie) wins++;
+    else if (iWin && isTie) ties++;
+  }
+
+  const equity = (wins + ties * 0.5) / iterations;
+
+  // Draw bonus smoothing (MC with limited iterations has noise on draws)
+  const drawBonus = flushDrawBonus(holeCards, board) * 0.5
+                  + straightDrawBonus(holeCards, board) * 0.5;
+
+  return clamp01(equity + drawBonus);
 }
 
 function madeHandStrength(name: string): number {
