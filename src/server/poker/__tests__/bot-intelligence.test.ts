@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor } from '../agents';
+import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier } from '../agents';
 
 describe('STYLE_CONFIG intelligence fields', () => {
   const styles = Object.keys(STYLE_CONFIG_FOR_TEST) as Array<keyof typeof STYLE_CONFIG_FOR_TEST>;
@@ -61,5 +61,31 @@ describe('Position awareness', () => {
     expect(getPositionFactor('EP')).toBe(-0.06);
     expect(getPositionFactor('SB')).toBe(-0.06);
     expect(getPositionFactor('BB')).toBe(-0.02);
+  });
+});
+
+describe('Bet sizing reads', () => {
+  it('small bet (< 0.4 pot) returns < 1.0 multiplier', () => {
+    expect(getBetSizingMultiplier(0.2)).toBeCloseTo(0.85, 2);
+    expect(getBetSizingMultiplier(0.39)).toBeCloseTo(0.85, 2);
+  });
+
+  it('medium bet (0.4-0.8 pot) returns 1.0 multiplier', () => {
+    expect(getBetSizingMultiplier(0.5)).toBeCloseTo(1.0, 2);
+    expect(getBetSizingMultiplier(0.8)).toBeCloseTo(1.0, 2);
+  });
+
+  it('large bet (0.8-1.3 pot) returns > 1.0 multiplier', () => {
+    expect(getBetSizingMultiplier(1.0)).toBeCloseTo(1.10, 2);
+    expect(getBetSizingMultiplier(1.3)).toBeCloseTo(1.10, 2);
+  });
+
+  it('overbet (> 1.3 pot) returns 1.2 multiplier', () => {
+    expect(getBetSizingMultiplier(1.5)).toBeCloseTo(1.20, 2);
+    expect(getBetSizingMultiplier(3.0)).toBeCloseTo(1.20, 2);
+  });
+
+  it('zero bet returns 1.0 (no adjustment)', () => {
+    expect(getBetSizingMultiplier(0)).toBeCloseTo(1.0, 2);
   });
 });

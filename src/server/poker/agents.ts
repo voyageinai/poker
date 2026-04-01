@@ -574,6 +574,19 @@ export class BuiltinBotAgent implements PlayerAgent {
   dispose(): void {}
 }
 
+/** Returns a callThreshold multiplier based on bet-to-pot ratio. */
+export function getBetSizingMultiplier(betSizeRatio: number): number {
+  if (betSizeRatio <= 0) return 1.0;
+  if (betSizeRatio < 0.4) return 0.85;
+  if (betSizeRatio <= 0.8) return 1.0;
+  if (betSizeRatio <= 1.3) return 1.10;
+  return 1.20;
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
 function chooseBuiltinAction(
   style: SystemBotStyle,
   strength: number,
@@ -595,6 +608,12 @@ function chooseBuiltinAction(
   // Nit: 0.65  TAG: 0.55  LAG: 0.44  Station: 0.66
   const raiseThreshold = 0.70 - cfg.aggression * 0.36 + potOdds * 0.04;
 
+  // Bet sizing adjustment
+  const betSizeRatio = req.toCall / Math.max(req.pot, 1);
+  const sizingMult = getBetSizingMultiplier(betSizeRatio);
+  const sizedCallThreshold = callThreshold * lerp(1.0, sizingMult, cfg.sizingSensitivity);
+  const sizedRaiseThreshold = raiseThreshold * lerp(1.0, sizingMult, cfg.sizingSensitivity);
+
   const minRaiseTotal = req.currentBet + req.minRaise;
   const maxRaiseTotal = req.currentBet + req.stack - req.toCall;
   const canRaise = req.stack > req.toCall && minRaiseTotal <= maxRaiseTotal;
@@ -605,7 +624,7 @@ function chooseBuiltinAction(
     if (strength > 0.75 && roll(cfg.slowplayRate)) {
       return { action: 'check' };
     }
-    if (canRaise && (strength > raiseThreshold || (strength > 0.32 && roll(cfg.bluffRate)))) {
+    if (canRaise && (strength > sizedRaiseThreshold || (strength > 0.32 && roll(cfg.bluffRate)))) {
       return chooseRaiseAction(req, strength, cfg);
     }
     return { action: 'check' };
@@ -617,7 +636,7 @@ function chooseBuiltinAction(
     return chooseRaiseAction(req, strength, cfg);
   }
 
-  if (strength < callThreshold) {
+  if (strength < sizedCallThreshold) {
     // Below calling threshold — sometimes bluff-raise with decent hands
     if (canRaise && strength > 0.45 && roll(cfg.bluffRate)) {
       return chooseRaiseAction(req, strength, cfg);
@@ -626,7 +645,7 @@ function chooseBuiltinAction(
   }
 
   // Above calling threshold — consider raising
-  if (canRaise && (strength > raiseThreshold || (strength > 0.42 && roll(cfg.raiseBias)))) {
+  if (canRaise && (strength > sizedRaiseThreshold || (strength > 0.42 && roll(cfg.raiseBias)))) {
     return chooseRaiseAction(req, strength, cfg);
   }
 
