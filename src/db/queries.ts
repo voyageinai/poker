@@ -501,6 +501,87 @@ export function recentCompletedHands(limit: number = 10): DbHand[] {
   ).all(limit) as DbHand[];
 }
 
+// ─── Admin: Hands (with human players) ──────────────────────────────────────
+
+export interface AdminHandPlayer {
+  username: string;
+  result: string | null;
+  profit: number;
+  hole_cards: string | null;
+}
+
+export interface AdminHandRow {
+  id: string;
+  hand_number: number;
+  table_name: string;
+  pot: number;
+  ended_at: number;
+  players: AdminHandPlayer[];
+}
+
+export function getAdminHands(params: { page?: number; pageSize?: number }): { rows: AdminHandRow[]; total: number } {
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 30));
+  const offset = (page - 1) * pageSize;
+  const db = getDb();
+
+  // Count distinct hands that have at least one human player
+  const total = (db.prepare(`
+    SELECT COUNT(DISTINCT h.id) as n
+    FROM poker_hands h
+    JOIN hand_players hp ON hp.hand_id = h.id
+    WHERE h.status = 'complete'
+      AND hp.user_id NOT LIKE 'system:%'
+  `).get() as { n: number }).n;
+
+  // Get paginated hand IDs
+  const handIds = db.prepare(`
+    SELECT DISTINCT h.id, h.ended_at
+    FROM poker_hands h
+    JOIN hand_players hp ON hp.hand_id = h.id
+    WHERE h.status = 'complete'
+      AND hp.user_id NOT LIKE 'system:%'
+    ORDER BY h.ended_at DESC
+    LIMIT ? OFFSET ?
+  `).all(pageSize, offset) as { id: string; ended_at: number }[];
+
+  if (handIds.length === 0) return { rows: [], total };
+
+  // Fetch hand details + human players in one query
+  const placeholders = handIds.map(() => '?').join(',');
+  const details = db.prepare(`
+    SELECT h.id, h.hand_number, t.name AS table_name, h.pot, h.ended_at,
+           u.username, hp.result, hp.hole_cards,
+           COALESCE(hp.stack_end, 0) - hp.stack_start AS profit
+    FROM poker_hands h
+    JOIN poker_tables t ON h.table_id = t.id
+    JOIN hand_players hp ON hp.hand_id = h.id
+    JOIN users u ON hp.user_id = u.id
+    WHERE h.id IN (${placeholders})
+      AND hp.user_id NOT LIKE 'system:%'
+    ORDER BY h.ended_at DESC, u.username
+  `).all(...handIds.map(r => r.id)) as {
+    id: string; hand_number: number; table_name: string; pot: number; ended_at: number;
+    username: string; result: string | null; hole_cards: string | null; profit: number;
+  }[];
+
+  // Group by hand
+  const map = new Map<string, AdminHandRow>();
+  for (const r of details) {
+    let hand = map.get(r.id);
+    if (!hand) {
+      hand = { id: r.id, hand_number: r.hand_number, table_name: r.table_name, pot: r.pot, ended_at: r.ended_at, players: [] };
+      map.set(r.id, hand);
+    }
+    hand.players.push({ username: r.username, result: r.result, profit: r.profit, hole_cards: r.hole_cards });
+  }
+
+  // Preserve order from handIds
+  const rows = handIds.map(h => map.get(h.id)).filter((h): h is AdminHandRow => !!h);
+
+  return { rows, total };
+}
+
 // ─── Admin: Bots ─────────────────────────────────────────────────────────────
 
 export interface BotWithOwner extends DbBot {

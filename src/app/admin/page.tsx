@@ -159,41 +159,108 @@ function OverviewTab() {
         </div>
       )}
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold text-text-secondary">最近对局</h3>
-        <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-xs text-text-muted">
-                <th className="px-3 py-2 text-left">#</th>
-                <th className="px-3 py-2 text-right">底池</th>
-                <th className="px-3 py-2 text-right">时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.recentHands.map(h => (
-                <tr key={h.id} className="border-b border-[var(--border)] last:border-0 hover:bg-bg-surface/60">
-                  <td className="px-3 py-2">
-                    <Link
-                      href={`/hand/${h.id}`}
-                      className="mono text-teal hover:underline text-xs"
-                    >
-                      {h.id.slice(0, 8)}
-                    </Link>
-                  </td>
-                  <td className="mono px-3 py-2 text-right text-amber">{h.pot.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-text-muted text-xs">{fmtTime(h.ended_at ?? h.started_at)}</td>
-                </tr>
-              ))}
-              {data.recentHands.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-3 py-4 text-center text-text-muted">暂无对局记录</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <RecentHandsSection />
+    </div>
+  );
+}
+
+// ─── Recent Hands Section ────────────────────────────────────────────────────
+
+interface AdminHandPlayer {
+  username: string;
+  result: string | null;
+  profit: number;
+  hole_cards: string | null;
+}
+
+interface AdminHandRow {
+  id: string;
+  hand_number: number;
+  table_name: string;
+  pot: number;
+  ended_at: number;
+  players: AdminHandPlayer[];
+}
+
+function RecentHandsSection() {
+  const [rows, setRows] = useState<AdminHandRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const pageSize = 30;
+
+  const fetchHands = useCallback((p: number) => {
+    setLoading(true);
+    const qs = new URLSearchParams({ page: String(p), pageSize: String(pageSize) });
+    fetch(withBasePath(`/api/admin/hands?${qs}`))
+      .then(r => r.json() as Promise<{ rows: AdminHandRow[]; total: number }>)
+      .then(d => { setRows(d.rows); setTotal(d.total); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { fetchHands(page); }, [fetchHands, page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-semibold text-text-secondary">
+        最近对局 <span className="font-normal text-text-muted">（共 {total} 局）</span>
+      </h3>
+
+      {loading ? (
+        <p className="py-8 text-center text-text-muted">加载中...</p>
+      ) : rows.length === 0 ? (
+        <p className="py-8 text-center text-text-muted">暂无对局记录</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map(h => (
+            <Link
+              key={h.id}
+              href={`/hand/${h.id}`}
+              className="block rounded-lg border border-[var(--border)] bg-bg-surface px-4 py-3 no-underline transition-colors hover:bg-bg-hover"
+            >
+              {/* Hand header */}
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-sm text-text-primary">第 {h.hand_number} 局</span>
+                <span className="text-xs text-text-muted truncate">{h.table_name}</span>
+                <span className="flex-1" />
+                <span className="text-xs text-text-muted">
+                  底池 <span className="mono text-amber">{h.pot.toLocaleString()}</span>
+                </span>
+                <span className="text-xs text-text-muted whitespace-nowrap">{fmtTime(h.ended_at)}</span>
+              </div>
+              {/* Human players */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {h.players.map((p, i) => (
+                  <span key={i} className="flex items-center gap-1.5 text-xs">
+                    <span className="text-text-secondary">{p.username}</span>
+                    <span className={cn(
+                      'mono font-bold',
+                      p.profit > 0 ? 'text-win' : p.profit < 0 ? 'text-loss' : 'text-text-muted',
+                    )}>
+                      {p.profit > 0 ? '+' : ''}{p.profit.toLocaleString()}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </Link>
+          ))}
         </div>
-      </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <Button variant="ghost" size="xs" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+            上一页
+          </Button>
+          <span className="text-xs text-text-muted">{page} / {totalPages}</span>
+          <Button variant="ghost" size="xs" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+            下一页
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

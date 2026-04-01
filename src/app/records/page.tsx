@@ -68,11 +68,13 @@ function fmtTime(ts: number) {
   });
 }
 
-function chipDelta(detail: string): { text: string; color: string } | null {
+const DEBIT_ACTIONS = new Set(['buyin', 'rebuy', 'bot_buyin']);
+
+function chipDelta(action: string, detail: string): { text: string; color: string } | null {
   try {
     const d = JSON.parse(detail) as Record<string, unknown>;
     if (typeof d.amount === 'number') {
-      const n = d.amount as number;
+      const n = DEBIT_ACTIONS.has(action) ? -(d.amount as number) : (d.amount as number);
       if (n > 0) return { text: `+${n.toLocaleString()}`, color: 'text-win' };
       if (n < 0) return { text: n.toLocaleString(), color: 'text-loss' };
     }
@@ -314,7 +316,7 @@ function LedgerTab() {
       ) : (
         <div className="space-y-2">
           {rows.map(r => {
-            const delta = chipDelta(r.detail);
+            const delta = chipDelta(r.action, r.detail);
             const extra = summarize(r.detail);
             return (
               <div
