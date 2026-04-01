@@ -13,8 +13,8 @@ describe('Bot decision performance', () => {
       seat: 0,
       stack: 1000,
       players: [
-        { seat: 0, displayName: 'Bot', stack: 1000, isBot: true },
-        { seat: 1, displayName: 'Opp', stack: 1000, isBot: false, elo: 1200 },
+        { seat: 0, playerId: 'bot0', displayName: 'Bot', stack: 1000, isBot: true },
+        { seat: 1, playerId: 'opp1', displayName: 'Opp', stack: 1000, isBot: false, elo: 1200 },
       ],
       smallBlind: 10,
       bigBlind: 20,
@@ -36,7 +36,46 @@ describe('Bot decision performance', () => {
     });
     const elapsed = performance.now() - start;
 
-    expect(elapsed).toBeLessThan(500);
+    // v2 perf gate: total decision < 200ms (MC equity + texture + stack-depth + sizing)
+    expect(elapsed).toBeLessThan(200);
+  });
+
+  it('multiway postflop decision completes within 200ms', async () => {
+    const def = SYSTEM_BOTS.find(b => b.style === 'adaptive')!;
+    const agent = new BuiltinBotAgent(def.userId, def);
+
+    agent.notify({
+      type: 'new_hand',
+      handId: 'perf-test-multi',
+      seat: 0,
+      stack: 1000,
+      players: [
+        { seat: 0, playerId: 'bot0', displayName: 'Bot', stack: 1000, isBot: true },
+        { seat: 1, playerId: 'opp1', displayName: 'Opp1', stack: 1000, isBot: true },
+        { seat: 2, playerId: 'opp2', displayName: 'Opp2', stack: 1000, isBot: true },
+        { seat: 3, playerId: 'opp3', displayName: 'Opp3', stack: 1000, isBot: true },
+      ],
+      smallBlind: 10,
+      bigBlind: 20,
+      buttonSeat: 3,
+    });
+    agent.notify({ type: 'hole_cards', cards: ['8h', '7h'] });
+    agent.notify({ type: 'street', name: 'turn', board: ['9c', 'Td', '2h', 'Jh'] });
+
+    const start = performance.now();
+    await agent.requestAction({
+      street: 'turn',
+      board: ['9c', 'Td', '2h', 'Jh'],
+      pot: 200,
+      currentBet: 0,
+      toCall: 0,
+      minRaise: 20,
+      stack: 800,
+      history: [],
+    });
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(200);
   });
 
   it('preflop decision completes within 5ms (no MC)', async () => {
@@ -49,8 +88,8 @@ describe('Bot decision performance', () => {
       seat: 0,
       stack: 1000,
       players: [
-        { seat: 0, displayName: 'Bot', stack: 1000, isBot: true },
-        { seat: 1, displayName: 'Opp', stack: 1000, isBot: true },
+        { seat: 0, playerId: 'bot0', displayName: 'Bot', stack: 1000, isBot: true },
+        { seat: 1, playerId: 'opp1', displayName: 'Opp', stack: 1000, isBot: true },
       ],
       smallBlind: 10,
       bigBlind: 20,

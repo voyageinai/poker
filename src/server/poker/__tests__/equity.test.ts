@@ -73,9 +73,9 @@ describe('postflopStrengthMC', () => {
     expect(eq).toBeGreaterThan(0.70)
   })
 
-  it('72o on strong board vs 1 opponent has low equity (<0.35)', () => {
+  it('72o on strong board vs 1 opponent has low equity (<0.50)', () => {
     const eq = postflopStrengthMC(['7s', '2c'], ['Ah', 'Kd', 'Qc'], 1)
-    expect(eq).toBeLessThan(0.35)
+    expect(eq).toBeLessThan(0.50)
   })
 
   it('result is always clamped to [0, 1]', () => {

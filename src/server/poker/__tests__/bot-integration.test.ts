@@ -14,9 +14,9 @@ function notifyNewHand(agent: BuiltinBotAgent, seat: number, stack: number, butt
     seat,
     stack,
     players: [
-      { seat: 0, displayName: 'P0', stack: 1000, isBot: true },
-      { seat: 1, displayName: 'P1', stack: 1000, isBot: false, elo: 1100 },
-      { seat: 2, displayName: 'P2', stack: 1000, isBot: true },
+      { seat: 0, playerId: 'p0', displayName: 'P0', stack: 1000, isBot: true },
+      { seat: 1, playerId: 'p1', displayName: 'P1', stack: 1000, isBot: false, elo: 1100 },
+      { seat: 2, playerId: 'p2', displayName: 'P2', stack: 1000, isBot: true },
     ],
     smallBlind: 10,
     bigBlind: 20,
@@ -250,8 +250,8 @@ describe('Bot integration', () => {
       agentH.notify({
         type: 'new_hand', handId: `h-${i}`, seat: 0, stack: 1000,
         players: [
-          { seat: 0, displayName: 'Bot', stack: 1000, isBot: true },
-          { seat: 1, displayName: 'Human', stack: 1000, isBot: false, elo: 1000 },
+          { seat: 0, playerId: 'bot0', displayName: 'Bot', stack: 1000, isBot: true },
+          { seat: 1, playerId: 'human1', displayName: 'Human', stack: 1000, isBot: false, elo: 1000 },
         ],
         smallBlind: 10, bigBlind: 20, buttonSeat: 0,
       });
@@ -266,8 +266,8 @@ describe('Bot integration', () => {
       agentB.notify({
         type: 'new_hand', handId: `b-${i}`, seat: 0, stack: 1000,
         players: [
-          { seat: 0, displayName: 'Bot', stack: 1000, isBot: true },
-          { seat: 1, displayName: 'Bot2', stack: 1000, isBot: true },
+          { seat: 0, playerId: 'bot0', displayName: 'Bot', stack: 1000, isBot: true },
+          { seat: 1, playerId: 'bot2', displayName: 'Bot2', stack: 1000, isBot: true },
         ],
         smallBlind: 10, bigBlind: 20, buttonSeat: 0,
       });

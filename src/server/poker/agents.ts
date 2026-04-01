@@ -18,6 +18,8 @@ import { preflopHandStrength as preflopHandStrengthV2 } from './strategy/preflop
 import { adjustForStackDepth } from './strategy/stack-depth';
 import { postflopStrengthMC as postflopStrengthMCV2 } from './strategy/equity';
 import { chooseBalancedAction, type BalancedActionRequest } from './strategy/balanced-strategy';
+import { OpponentTracker } from './strategy/opponent-model';
+import { chooseBetSize, type LegalConstraints } from './strategy/bet-sizing';
 
 const BOT_ACTION_TIMEOUT_MS = parseInt(process.env.BOT_ACTION_TIMEOUT_MS ?? '5000', 10);
 const HUMAN_ACTION_TIMEOUT_MS = parseInt(process.env.HUMAN_ACTION_TIMEOUT_MS ?? '30000', 10);
@@ -470,10 +472,14 @@ export class BuiltinBotAgent implements PlayerAgent {
   private recentResults: number[] = [];  // last N hand results: +chips or -chips
   private tiltLevel = 0;                 // 0 = calm, up to 1.0 = full tilt
 
-  // ─── Adaptive state (曹操) ────────────────────────────────────────────────
-  private opponentStats = new Map<number, OpponentStats>();
+  // ─── Opponent modeling (v2: per-player, per-street) ─────────────────────
+  private opponentTracker = new OpponentTracker();
+  private opponentStats = new Map<number, OpponentStats>(); // legacy seat-keyed (used by getAverageOpponentProfile)
+  private seatToPlayerId = new Map<number, string>();  // seat → playerId mapping for current hand
   private currentStreet: 'preflop' | 'flop' | 'turn' | 'river' = 'preflop';
   private preflopActors = new Set<number>();  // seats that acted preflop (non-blind)
+  private preflopAggressor: string | null = null;  // playerId of last preflop raiser (for cbet tracking)
+  private flopPlayerIds: string[] = [];  // players who saw the flop (for WTSD)
 
   // ─── Multi-street memory ─────────────────────────────────────────────────
   private handActions: HandActionRecord = { preflop: [], flop: [], turn: [], river: [] };
@@ -503,16 +509,25 @@ export class BuiltinBotAgent implements PlayerAgent {
         );
         // Track player metadata for human pressure
         this.playerMeta.clear();
+        this.seatToPlayerId.clear();
+        this.preflopAggressor = null;
+        this.flopPlayerIds = [];
         for (const p of msg.players) {
           this.playerMeta.set(p.seat, { isBot: p.isBot, elo: p.elo });
+          this.seatToPlayerId.set(p.seat, p.playerId);
         }
-        // Ensure stats exist for all opponents
+        // v2: per-player tracking via OpponentTracker
+        for (const p of msg.players) {
+          if (p.seat !== this.mySeat) {
+            this.opponentTracker.recordNewHand(p.playerId);
+          }
+        }
+        // Legacy: ensure stats exist for all opponents (kept for backward compat)
         for (const p of msg.players) {
           if (p.seat !== this.mySeat && !this.opponentStats.has(p.seat)) {
             this.opponentStats.set(p.seat, { hands: 0, vpip: 0, pfr: 0, aggActions: 0, passActions: 0, cbetOpportunities: 0, cbets: 0, foldToCbetCount: 0, foldToCbetOpportunities: 0, wtsdCount: 0, wtsdOpportunities: 0 });
           }
         }
-        // Increment hand count for all opponents
         for (const p of msg.players) {
           if (p.seat !== this.mySeat) {
             const s = this.opponentStats.get(p.seat);
@@ -525,6 +540,14 @@ export class BuiltinBotAgent implements PlayerAgent {
         break;
       case 'street':
         this.currentStreet = msg.name as 'preflop' | 'flop' | 'turn' | 'river';
+        // v2: track players who saw the flop (for WTSD opportunity)
+        if (this.currentStreet === 'flop') {
+          this.flopPlayerIds = [];
+          for (const [seat, pid] of this.seatToPlayerId) {
+            if (seat !== this.mySeat) this.flopPlayerIds.push(pid);
+          }
+          this.opponentTracker.recordSawFlop(this.flopPlayerIds);
+        }
         break;
       case 'player_action': {
         // Track all actions for multi-street pattern detection
@@ -532,6 +555,7 @@ export class BuiltinBotAgent implements PlayerAgent {
         if (msg.seat === this.mySeat) break;
         const s = this.opponentStats.get(msg.seat);
         if (!s) break;
+        // Legacy seat-keyed stats
         if (this.currentStreet === 'preflop') {
           if (msg.action === 'call' || msg.action === 'raise' || msg.action === 'allin') {
             if (!this.preflopActors.has(msg.seat)) s.vpip++;
@@ -541,6 +565,23 @@ export class BuiltinBotAgent implements PlayerAgent {
         } else {
           if (msg.action === 'raise' || msg.action === 'allin') s.aggActions++;
           else if (msg.action === 'call' || msg.action === 'check') s.passActions++;
+        }
+        // v2: per-player OpponentTracker
+        const pid = this.seatToPlayerId.get(msg.seat);
+        if (pid) {
+          const isVpip = this.currentStreet === 'preflop'
+            && (msg.action === 'call' || msg.action === 'raise' || msg.action === 'allin')
+            && !this.preflopActors.has(msg.seat);
+          const isPfr = this.currentStreet === 'preflop'
+            && (msg.action === 'raise' || msg.action === 'allin');
+          this.opponentTracker.recordAction(pid, this.currentStreet, msg.action as 'fold'|'check'|'call'|'raise'|'allin', {
+            isVpip,
+            isPfr,
+          });
+          // Track preflop aggressor for cbet
+          if (this.currentStreet === 'preflop' && (msg.action === 'raise' || msg.action === 'allin')) {
+            this.preflopAggressor = pid;
+          }
         }
         break;
       }
@@ -559,6 +600,10 @@ export class BuiltinBotAgent implements PlayerAgent {
         this.tiltLevel = clamp01(recentLosses / 5 * 1.2); // 3/5 losses = 0.72 tilt, 5/5 = 1.0
         break;
       }
+      case 'showdown_result':
+        // v2: track who reached showdown (for WTSD)
+        this.opponentTracker.recordShowdown(msg.players.map(p => p.playerId));
+        break;
       case 'action_request':
         break;
     }
@@ -616,16 +661,39 @@ export class BuiltinBotAgent implements PlayerAgent {
       }
     }
 
-    // ─── Universal opponent modeling (all styles, scaled by exploitWeight) ─
-    const oppProfile = this.getAverageOpponentProfile();
-    if (oppProfile.hands >= 8) {
-      const exploit = computeExploit(oppProfile);
-      cfg.aggression = clamp01(cfg.aggression + exploit.aggressionDelta * cfg.exploitWeight);
-      cfg.bluffRate = clamp01(cfg.bluffRate + exploit.bluffDelta * cfg.exploitWeight);
-      cfg.slowplayRate = clamp01(cfg.slowplayRate + exploit.slowplayDelta * cfg.exploitWeight);
-      cfg.checkRaiseRate = clamp01(cfg.checkRaiseRate + exploit.checkRaiseDelta * cfg.exploitWeight);
-      if (!extraReasoning) {
-        extraReasoning = ` 对手画像(VPIP ${Math.round(oppProfile.vpipRate * 100)}% AF ${oppProfile.af.toFixed(1)}).`;
+    // ─── Universal opponent modeling (v2: per-player, scaled by exploitWeight) ─
+    // Try per-player exploit first (v2), fall back to legacy average
+    let exploitApplied = false;
+    if (req.history.length > 0) {
+      const lastActor = req.history[req.history.length - 1];
+      const targetPid = this.seatToPlayerId.get(lastActor.seat);
+      if (targetPid) {
+        const exploit = this.opponentTracker.computeExploit(targetPid);
+        if (exploit) {
+          cfg.aggression = clamp01(cfg.aggression + exploit.aggressionDelta * cfg.exploitWeight);
+          cfg.bluffRate = clamp01(cfg.bluffRate + exploit.bluffDelta * cfg.exploitWeight);
+          cfg.slowplayRate = clamp01(cfg.slowplayRate + exploit.slowplayDelta * cfg.exploitWeight);
+          cfg.checkRaiseRate = clamp01(cfg.checkRaiseRate + exploit.checkRaiseDelta * cfg.exploitWeight);
+          const profile = this.opponentTracker.getProfile(targetPid);
+          if (profile && !extraReasoning) {
+            extraReasoning = ` 对手${targetPid}(VPIP ${Math.round(profile.vpipRate * 100)}% AF ${profile.af.toFixed(1)}).`;
+          }
+          exploitApplied = true;
+        }
+      }
+    }
+    // Legacy fallback: average opponent profile
+    if (!exploitApplied) {
+      const oppProfile = this.getAverageOpponentProfile();
+      if (oppProfile.hands >= 8) {
+        const exploit = computeExploit(oppProfile);
+        cfg.aggression = clamp01(cfg.aggression + exploit.aggressionDelta * cfg.exploitWeight);
+        cfg.bluffRate = clamp01(cfg.bluffRate + exploit.bluffDelta * cfg.exploitWeight);
+        cfg.slowplayRate = clamp01(cfg.slowplayRate + exploit.slowplayDelta * cfg.exploitWeight);
+        cfg.checkRaiseRate = clamp01(cfg.checkRaiseRate + exploit.checkRaiseDelta * cfg.exploitWeight);
+        if (!extraReasoning) {
+          extraReasoning = ` 对手画像(VPIP ${Math.round(oppProfile.vpipRate * 100)}% AF ${oppProfile.af.toFixed(1)}).`;
+        }
       }
     }
 
@@ -718,7 +786,7 @@ export class BuiltinBotAgent implements PlayerAgent {
     }
 
     const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
-    const action = chooseBuiltinAction(style, adjustedStrength, potOdds, req, cfg);
+    const action = chooseBuiltinAction(style, adjustedStrength, potOdds, req, cfg, texture);
 
     return Promise.resolve({
       ...action,
@@ -843,6 +911,7 @@ function chooseBuiltinAction(
   potOdds: number,
   req: ActionRequest,
   cfg?: StyleParams,
+  texture?: BoardTexture | null,
 ): PokerAction {
   if (!cfg) cfg = STYLE_CONFIG[style];
 
@@ -911,7 +980,7 @@ function chooseBuiltinAction(
       return { action: 'check' };
     }
     if (canRaise && strength > sizedRaiseThreshold) {
-      return chooseRaiseAction(req, strength, cfg);
+      return chooseRaiseAction(req, strength, cfg, style, texture);
     }
     // Thin value bet: medium-strength hands bet smaller for value
     if (canRaise && strength > valueBetFloor && strength <= sizedRaiseThreshold) {
@@ -924,7 +993,7 @@ function chooseBuiltinAction(
     }
     // Bluff bet: aggressive styles can bet with air
     if (canRaise && strength > bluffFloor && roll(cfg.bluffRate)) {
-      return chooseRaiseAction(req, strength, cfg);
+      return chooseRaiseAction(req, strength, cfg, style, texture);
     }
     return { action: 'check' };
   }
@@ -932,20 +1001,20 @@ function chooseBuiltinAction(
   // Facing a bet: fold / call / raise
   // Check-raise opportunity: if we checked and now face a bet with a strong hand
   if (canRaise && strength > 0.65 && roll(cfg.checkRaiseRate)) {
-    return chooseRaiseAction(req, strength, cfg);
+    return chooseRaiseAction(req, strength, cfg, style, texture);
   }
 
   if (strength < sizedCallThreshold) {
     // Below calling threshold — sometimes bluff-raise
     if (canRaise && strength > bluffFloor + 0.10 && roll(cfg.bluffRate)) {
-      return chooseRaiseAction(req, strength, cfg);
+      return chooseRaiseAction(req, strength, cfg, style, texture);
     }
     return { action: 'fold' };
   }
 
   // Above calling threshold — consider raising
   if (canRaise && (strength > sizedRaiseThreshold || (strength > raiseBiasFloor && roll(cfg.raiseBias)))) {
-    return chooseRaiseAction(req, strength, cfg);
+    return chooseRaiseAction(req, strength, cfg, style, texture);
   }
 
   // All-in call when pot-committed
@@ -960,6 +1029,8 @@ function chooseRaiseAction(
   req: ActionRequest,
   strength: number,
   cfg: StyleParams,
+  style: SystemBotStyle = 'tag',
+  texture?: BoardTexture | null,
 ): PokerAction {
   if (req.stack <= req.toCall) return { action: 'allin' };
 
@@ -971,17 +1042,22 @@ function chooseRaiseAction(
     return { action: 'allin' };
   }
 
-  const potComponent = Math.round(req.pot * (0.35 + cfg.aggression * 0.65));
-  const pressureComponent = Math.round(req.toCall + req.minRaise + strength * req.pot * 0.35);
+  // v2: use geometric bet sizing module with texture awareness
+  const streetsLeft = req.street === 'preflop' ? 4 : req.street === 'flop' ? 3 : req.street === 'turn' ? 2 : 1;
+  const isBluff = strength < 0.35;
+  const legalConstraints: LegalConstraints = {
+    minRaise: req.minRaise,
+    currentBet: req.currentBet,
+  };
+  const sizing = chooseBetSize(req.pot, req.stack, streetsLeft, texture ?? null, strength, style, isBluff, legalConstraints);
+
   let raiseTotal = clampInt(
-    Math.max(minRaiseTotal, req.currentBet + Math.max(potComponent, pressureComponent)),
+    Math.max(minRaiseTotal, req.currentBet + sizing.amount),
     minRaiseTotal,
     maxRaiseTotal,
   );
 
   // Preflop sizing cap: non-premium hands shouldn't over-commit
-  // Premium hands (strength > 0.75) are exempt — they can go big
-  // Cap varies by style: maniac 50%, lag 35%, others 25%
   if (req.street === 'preflop' && strength < 0.75) {
     const rInitStack = req.initialStack ?? req.stack;
     const maxPreflop = Math.round(rInitStack * cfg.preflopCommitCap);

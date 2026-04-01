@@ -303,7 +303,7 @@ export type PbpServerMessage =
       handId: string;
       seat: number;
       stack: number;
-      players: Array<{ seat: number; displayName: string; stack: number; isBot: boolean; elo?: number }>;
+      players: Array<{ seat: number; playerId: string; displayName: string; stack: number; isBot: boolean; elo?: number }>;
       smallBlind: number;
       bigBlind: number;
       buttonSeat: number;
@@ -322,7 +322,8 @@ export type PbpServerMessage =
     }
   | { type: 'player_action'; seat: number; action: ActionType; amount: number }
   | { type: 'street'; name: Street; board: Card[] }
-  | { type: 'hand_over'; winners: Array<{ seat: number; amount: number }>; board: Card[] };
+  | { type: 'hand_over'; winners: Array<{ seat: number; amount: number }>; board: Card[] }
+  | { type: 'showdown_result'; players: Array<{ seat: number; playerId: string; cards: [Card, Card] }> };
 
 // Bot → Server (stdout, newline-delimited JSON)
 export interface PbpBotMessage {

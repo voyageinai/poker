@@ -334,7 +334,7 @@ export class TableManager {
               const user = db.getUserById(pl.userId);
               if (user) elo = user.elo;
             }
-            return { seat: pl.seatIndex, displayName: pl.displayName, stack: pl.stack, isBot, elo };
+            return { seat: pl.seatIndex, playerId: pl.userId, displayName: pl.displayName, stack: pl.stack, isBot, elo };
           }),
         smallBlind: this.state._smallBlind,
         bigBlind: this.state._bigBlind,
@@ -473,6 +473,13 @@ export class TableManager {
           type: 'showdown',
           results: event.results,
         } satisfies WsServerMessage);
+        // Notify bots of showdown participants (for WTSD tracking)
+        for (const info of this.agents.values()) {
+          info.agent.notify({
+            type: 'showdown_result',
+            players: event.results.map(r => ({ seat: r.seat, playerId: r.userId, cards: r.holeCards })),
+          });
+        }
         break;
       }
 

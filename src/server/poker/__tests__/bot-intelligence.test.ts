@@ -233,8 +233,8 @@ describe('PBP new_hand extension type check', () => {
       seat: 0,
       stack: 1000,
       players: [
-        { seat: 0, displayName: 'Alice', stack: 1000, isBot: false, elo: 1200 },
-        { seat: 1, displayName: 'Bot1', stack: 1000, isBot: true },
+        { seat: 0, playerId: 'alice', displayName: 'Alice', stack: 1000, isBot: false, elo: 1200 },
+        { seat: 1, playerId: 'bot1', displayName: 'Bot1', stack: 1000, isBot: true },
       ],
       smallBlind: 10,
       bigBlind: 20,
@@ -260,8 +260,8 @@ describe('GTO bot uses MC equity', () => {
       seat: 0,
       stack: 1000,
       players: [
-        { seat: 0, displayName: 'GTO', stack: 1000, isBot: true },
-        { seat: 1, displayName: 'Opp', stack: 1000, isBot: true },
+        { seat: 0, playerId: 'gto', displayName: 'GTO', stack: 1000, isBot: true },
+        { seat: 1, playerId: 'opp', displayName: 'Opp', stack: 1000, isBot: true },
       ],
       smallBlind: 10,
       bigBlind: 20,
