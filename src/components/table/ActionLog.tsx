@@ -98,7 +98,7 @@ export default function ActionLog({ entries, players }: ActionLogProps) {
                 </span>
                 <div className="flex gap-[3px]">
                   {entry.cards?.map((c, i) => (
-                    <PlayingCard key={i} card={c} size="sm" />
+                    <PlayingCard key={i} card={c} size="xs" />
                   ))}
                 </div>
               </div>

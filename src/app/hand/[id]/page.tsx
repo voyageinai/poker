@@ -198,19 +198,19 @@ export default function HandReplayPage() {
                   {holeCards ? (
                     <>
                       <div style={{ transform: 'rotate(-4deg)', zIndex: 1 }}>
-                        <PlayingCard card={holeCards[0]} size="sm" />
+                        <PlayingCard card={holeCards[0]} size="md" />
                       </div>
-                      <div style={{ marginLeft: '-6px', transform: 'rotate(4deg)', zIndex: 2 }}>
-                        <PlayingCard card={holeCards[1]} size="sm" />
+                      <div style={{ marginLeft: '-8px', transform: 'rotate(4deg)', zIndex: 2 }}>
+                        <PlayingCard card={holeCards[1]} size="md" />
                       </div>
                     </>
                   ) : (
                     <>
                       <div style={{ transform: 'rotate(-4deg)', zIndex: 1 }}>
-                        <PlayingCard faceDown size="sm" />
+                        <PlayingCard faceDown size="md" />
                       </div>
-                      <div style={{ marginLeft: '-6px', transform: 'rotate(4deg)', zIndex: 2 }}>
-                        <PlayingCard faceDown size="sm" />
+                      <div style={{ marginLeft: '-8px', transform: 'rotate(4deg)', zIndex: 2 }}>
+                        <PlayingCard faceDown size="md" />
                       </div>
                     </>
                   )}
@@ -270,7 +270,7 @@ export default function HandReplayPage() {
               </span>
               <div className="flex gap-1">
                 {boardByStreet(street).map((c, i) => (
-                  <PlayingCard key={i} card={c} size="sm" />
+                  <PlayingCard key={i} card={c} size="xs" />
                 ))}
               </div>
             </div>

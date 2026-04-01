@@ -16,22 +16,26 @@ const SUIT_GLOW: Record<Suit, string> = {
 interface Props {
   card?: Card | null;
   faceDown?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   animate3D?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
 
 const SIZE_CLASSES = {
-  sm: 'w-8 h-11 text-[0.65rem]',
-  md: 'w-12 h-[66px] text-base',
-  lg: 'w-[64px] h-[88px] text-xl',
+  xs: 'w-7 h-10 text-[0.55rem]',
+  sm: 'w-11 h-[60px] text-sm',
+  md: 'w-14 h-[76px] text-base',
+  lg: 'w-[72px] h-[100px] text-2xl',
+  xl: 'w-[88px] h-[122px] text-3xl',
 } as const;
 
 const WATERMARK_SIZES = {
-  sm: 'text-[1.2rem]',
-  md: 'text-[2rem]',
-  lg: 'text-[2.8rem]',
+  xs: 'text-[0.9rem]',
+  sm: 'text-[1.6rem]',
+  md: 'text-[2.2rem]',
+  lg: 'text-[3rem]',
+  xl: 'text-[3.8rem]',
 } as const;
 
 /** Card back with branded crosshatch pattern */
@@ -77,7 +81,7 @@ function CardFace({ card, sizeClass, watermarkSize, className, style }: {
         'relative inline-flex flex-col items-start justify-between overflow-hidden rounded-md',
         'font-mono font-bold select-none',
         'edge-light',
-        red ? 'text-red-card' : 'text-[#c8d6e5]',
+        red ? 'text-[#ff5555]' : 'text-[#e8f0f8]',
         className,
       )}
       style={{
@@ -90,7 +94,7 @@ function CardFace({ card, sizeClass, watermarkSize, className, style }: {
       {/* Suit watermark */}
       <div className={cn(
         'pointer-events-none absolute inset-0 flex items-center justify-center',
-        watermarkSize, 'opacity-[0.08]',
+        watermarkSize, 'opacity-[0.12]',
       )}>
         {symbol}
       </div>

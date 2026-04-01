@@ -42,8 +42,8 @@ export default function ShowdownPanel({ showdown, winnerSeats, compact }: Showdo
               >
                 {result.displayName}
               </span>
-              <PlayingCard card={result.holeCards[0]} size="sm" />
-              <PlayingCard card={result.holeCards[1]} size="sm" />
+              <PlayingCard card={result.holeCards[0]} size={compact ? 'sm' : 'md'} />
+              <PlayingCard card={result.holeCards[1]} size={compact ? 'sm' : 'md'} />
               <span
                 className={cn(
                   'ml-auto whitespace-nowrap font-mono',

@@ -70,8 +70,8 @@ export default function SeatView({
   // ── Mobile compact: 90px hero, 64px others ──────────────────────────────────
   // ── Desktop: 200px hero, 130px others ───────────────────────────────────────
   const seatWidth = compact
-    ? isMe ? 90 : 64
-    : isMe ? 200 : 130;
+    ? isMe ? 100 : 72
+    : isMe ? 220 : 140;
 
   return (
     <motion.div
@@ -167,13 +167,13 @@ export default function SeatView({
       <div className={cn('flex justify-center', compact ? 'gap-px' : 'gap-[3px] my-[0.15rem]')}>
         {holeCards ? (
           <>
-            <PlayingCard card={holeCards[0]} size="sm" />
-            <PlayingCard card={holeCards[1]} size="sm" />
+            <PlayingCard card={holeCards[0]} size={compact ? (isMe ? 'md' : 'sm') : (isMe ? 'xl' : 'md')} />
+            <PlayingCard card={holeCards[1]} size={compact ? (isMe ? 'md' : 'sm') : (isMe ? 'xl' : 'md')} />
           </>
         ) : player.status !== 'folded' && player.status !== 'sitting_out' ? (
           <>
-            <PlayingCard faceDown size="sm" />
-            <PlayingCard faceDown size="sm" />
+            <PlayingCard faceDown size={compact ? (isMe ? 'md' : 'sm') : (isMe ? 'xl' : 'md')} />
+            <PlayingCard faceDown size={compact ? (isMe ? 'md' : 'sm') : (isMe ? 'xl' : 'md')} />
           </>
         ) : null}
       </div>
