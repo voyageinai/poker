@@ -286,12 +286,61 @@ interface OpponentStats {
   passActions: number;  // check/call count postflop
 }
 
+// ─── Position awareness ──────────────────────────────────────────────────────
+
+export type Position = 'EP' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
+
+export function calcPosition(mySeat: number, buttonSeat: number, seatList: number[]): Position {
+  const n = seatList.length;
+  if (n <= 1) return 'BTN';
+
+  // Sort seats in clockwise order starting from the seat after the button
+  const sorted = [...seatList].sort((a, b) => a - b);
+  const btnIdx = sorted.indexOf(buttonSeat);
+  // Rotate so position 0 = button
+  const rotated: number[] = [];
+  for (let i = 0; i < n; i++) {
+    rotated.push(sorted[(btnIdx + i) % n]);
+  }
+
+  const myIdx = rotated.indexOf(mySeat);
+
+  // Heads-up special case: BTN is SB
+  if (n === 2) return myIdx === 0 ? 'SB' : 'BB';
+
+  if (myIdx === 0) return 'BTN';
+  if (myIdx === 1) return 'SB';
+  if (myIdx === 2) return 'BB';
+  if (myIdx === n - 1) return 'CO';
+
+  // Remaining seats: split into EP and MP
+  const middleCount = n - 4;
+  if (middleCount <= 0) return 'MP';
+  const epCount = Math.ceil(middleCount / 2);
+  const posInMiddle = myIdx - 3;
+  return posInMiddle < epCount ? 'EP' : 'MP';
+}
+
+export function getPositionFactor(position: Position): number {
+  switch (position) {
+    case 'BTN': return 0.08;
+    case 'CO':  return 0.06;
+    case 'MP':  return 0;
+    case 'EP':  return -0.06;
+    case 'SB':  return -0.06;
+    case 'BB':  return -0.02;
+  }
+}
+
 export class BuiltinBotAgent implements PlayerAgent {
   readonly timeoutMs = BOT_ACTION_TIMEOUT_MS;
   private holeCards: [Card, Card] | null = null;
   private players: Array<{ seat: number; displayName: string; stack: number }> = [];
   private mySeat = -1;
   private bigBlind = 20;
+
+  // ─── Position tracking ────────────────────────────────────────────────────
+  private myPosition: Position = 'MP';
 
   // ─── Tilter state (林冲) ──────────────────────────────────────────────────
   private recentResults: number[] = [];  // last N hand results: +chips or -chips
@@ -316,6 +365,11 @@ export class BuiltinBotAgent implements PlayerAgent {
         this.bigBlind = msg.bigBlind ?? 20;
         this.currentStreet = 'preflop';
         this.preflopActors.clear();
+        this.myPosition = calcPosition(
+          msg.seat,
+          msg.buttonSeat,
+          msg.players.map(p => p.seat),
+        );
         // Ensure stats exist for all opponents
         for (const p of msg.players) {
           if (p.seat !== this.mySeat && !this.opponentStats.has(p.seat)) {
@@ -477,7 +531,10 @@ export class BuiltinBotAgent implements PlayerAgent {
       ? preflopStrength(this.holeCards)
       : postflopStrength(this.holeCards, req.board);
     const crowdPenalty = Math.max(0, opponents - 2) * 0.04 * cfg.crowdSensitivity;
-    const adjustedStrength = clamp01(strength - crowdPenalty + cfg.looseness * 0.25);
+    const posFactor = getPositionFactor(this.myPosition) * cfg.positionSensitivity;
+    const isLatePosition = this.myPosition === 'BTN' || this.myPosition === 'CO';
+    cfg.bluffRate = clamp01(cfg.bluffRate + (isLatePosition ? 0.03 : -0.02) * cfg.positionSensitivity);
+    const adjustedStrength = clamp01(strength - crowdPenalty + cfg.looseness * 0.25 + posFactor);
     const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
     const action = chooseBuiltinAction(style, adjustedStrength, potOdds, req, cfg);
 
