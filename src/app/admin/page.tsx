@@ -42,9 +42,9 @@ interface AdminUser {
   username: string;
   chips: number;
   elo: number;
-  hand_count: number;
+  games_played: number;
   role: string;
-  is_banned: number;
+  banned: number;
 }
 
 interface ChipCode {
@@ -355,7 +355,7 @@ function UsersTab() {
                     <td className="px-3 py-2 font-medium text-text-primary">{u.username}</td>
                     <td className="mono px-3 py-2 text-right text-amber">{u.chips.toLocaleString()}</td>
                     <td className="mono px-3 py-2 text-right">{u.elo}</td>
-                    <td className="mono px-3 py-2 text-right">{u.hand_count}</td>
+                    <td className="mono px-3 py-2 text-right">{u.games_played}</td>
                     <td className="px-3 py-2 text-center">
                       {u.role === 'admin' ? (
                         <Badge className="bg-amber-dim border-amber text-amber">管理员</Badge>
@@ -364,7 +364,7 @@ function UsersTab() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      {u.is_banned ? (
+                      {u.banned ? (
                         <Badge variant="destructive">已封禁</Badge>
                       ) : (
                         <Badge className="bg-win/10 border-win/30 text-win">正常</Badge>
@@ -374,12 +374,12 @@ function UsersTab() {
                       <div className="flex justify-end gap-1">
                         <ChipDialog user={u} onDone={() => fetchUsers(search || undefined)} />
                         <Button
-                          variant={u.is_banned ? 'teal' : 'destructive'}
+                          variant={u.banned ? 'teal' : 'destructive'}
                           size="xs"
                           disabled={busy}
                           onClick={() => postAction(`/api/admin/users/${u.id}/ban`)}
                         >
-                          {u.is_banned ? '解封' : '封禁'}
+                          {u.banned ? '解封' : '封禁'}
                         </Button>
                         <Button
                           variant="amber"
