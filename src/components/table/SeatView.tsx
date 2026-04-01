@@ -15,6 +15,7 @@ interface SeatViewProps {
   isWinner?: boolean;
   initialStack?: number;
   compact?: boolean;
+  totalSeats?: number;
 }
 
 export default function SeatView({
@@ -25,6 +26,7 @@ export default function SeatView({
   isWinner,
   initialStack = 1000,
   compact,
+  totalSeats,
 }: SeatViewProps) {
   const actionColors: Record<string, string> = {
     fold: 'var(--fold)',
@@ -69,9 +71,8 @@ export default function SeatView({
 
   // ── Mobile compact: 90px hero, 64px others ──────────────────────────────────
   // ── Desktop: 200px hero, 130px others ───────────────────────────────────────
-  const seatWidth = compact
-    ? isMe ? 100 : 72
-    : isMe ? 220 : 140;
+  const is9Max = totalSeats !== undefined && totalSeats > 6;
+  const seatWidth = compact ? (is9Max ? 68 : 80) : isMe ? 220 : 140;
 
   return (
     <motion.div
@@ -119,9 +120,9 @@ export default function SeatView({
         <span
           className={cn(
             'font-semibold overflow-hidden text-ellipsis whitespace-nowrap leading-tight',
-            compact ? 'text-[0.5rem]' : 'text-xs',
+            compact ? (is9Max ? 'text-[0.55rem]' : 'text-[0.6rem]') : 'text-xs',
             isMe ? 'text-amber' : 'text-text-primary',
-            compact ? (isMe ? 'max-w-[52px]' : 'max-w-[32px]') : (isMe ? 'max-w-[120px]' : 'max-w-[70px]'),
+            compact ? (is9Max ? 'max-w-[36px]' : 'max-w-[48px]') : (isMe ? 'max-w-[120px]' : 'max-w-[70px]'),
           )}
         >
           {player.displayName}
@@ -167,20 +168,20 @@ export default function SeatView({
       <div className={cn('flex justify-center', compact ? 'gap-px' : 'gap-[3px] my-[0.15rem]')}>
         {holeCards ? (
           <>
-            <PlayingCard card={holeCards[0]} size={compact ? (isMe ? 'md' : 'sm') : (isMe ? 'xl' : 'md')} />
-            <PlayingCard card={holeCards[1]} size={compact ? (isMe ? 'md' : 'sm') : (isMe ? 'xl' : 'md')} />
+            <PlayingCard card={holeCards[0]} size={compact ? (is9Max ? 'xs' : 'sm') : (isMe ? 'xl' : 'md')} />
+            <PlayingCard card={holeCards[1]} size={compact ? (is9Max ? 'xs' : 'sm') : (isMe ? 'xl' : 'md')} />
           </>
         ) : player.status !== 'folded' && player.status !== 'sitting_out' ? (
           <>
-            <PlayingCard faceDown size={compact ? (isMe ? 'md' : 'sm') : (isMe ? 'xl' : 'md')} />
-            <PlayingCard faceDown size={compact ? (isMe ? 'md' : 'sm') : (isMe ? 'xl' : 'md')} />
+            <PlayingCard faceDown size={compact ? (is9Max ? 'xs' : 'sm') : (isMe ? 'xl' : 'md')} />
+            <PlayingCard faceDown size={compact ? (is9Max ? 'xs' : 'sm') : (isMe ? 'xl' : 'md')} />
           </>
         ) : null}
       </div>
 
       {/* Stack + action */}
       <div className="flex justify-between items-center">
-        <span className={cn('chip-count mono', compact ? 'text-[0.5rem]' : 'text-[0.85rem]')}>
+        <span className={cn('chip-count mono', compact ? 'text-[0.6rem]' : 'text-[0.85rem]')}>
           {player.stack}
         </span>
         {player.lastAction && !compact && (
