@@ -1040,19 +1040,6 @@ function preflopStrength([a, b]: [Card, Card]): number {
   return clamp01(score);
 }
 
-function postflopStrength(holeCards: [Card, Card], board: Card[]): number {
-  const result = evaluateHand(holeCards, board);
-  let score = madeHandStrength(result.name);
-
-  if (result.name.includes('Pair')) {
-    score += pairQualityBonus(holeCards, board);
-  }
-
-  score += flushDrawBonus(holeCards, board);
-  score += straightDrawBonus(holeCards, board);
-  return clamp01(score);
-}
-
 /**
  * Monte Carlo postflop equity estimation.
  * Simulates against `opponents` random hands, completing the board randomly.
@@ -1119,29 +1106,6 @@ export function postflopStrengthMC(
                   + straightDrawBonus(holeCards, board) * 0.5;
 
   return clamp01(equity + drawBonus);
-}
-
-function madeHandStrength(name: string): number {
-  if (name.includes('Royal Flush') || name.includes('Straight Flush')) return 0.99;
-  if (name.includes('Four of a Kind')) return 0.97;
-  if (name.includes('Full House')) return 0.94;
-  if (name.includes('Flush')) return 0.89;
-  if (name.includes('Straight')) return 0.84;
-  if (name.includes('Three of a Kind')) return 0.74;
-  if (name.includes('Two Pair')) return 0.65;
-  if (name.includes('Pair')) return 0.48;
-  return 0.22;
-}
-
-function pairQualityBonus(holeCards: [Card, Card], board: Card[]): number {
-  const hole = holeCards.map(card => RANK_VALUE[card[0]]).sort((a, b) => b - a);
-  const boardRanks = board.map(card => RANK_VALUE[card[0]]).sort((a, b) => b - a);
-  const topBoard = boardRanks[0] ?? 0;
-
-  if (hole[0] === hole[1] && hole[0] > topBoard) return 0.16;
-  if (hole.includes(topBoard)) return 0.1;
-  if (hole.some(rank => boardRanks.slice(1, 3).includes(rank))) return 0.05;
-  return 0;
 }
 
 function flushDrawBonus(holeCards: [Card, Card], board: Card[]): number {
