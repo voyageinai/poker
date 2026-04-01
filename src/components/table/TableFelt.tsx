@@ -34,6 +34,25 @@ export function getSeatPosition(
   };
 }
 
+/**
+ * Mobile layout: distribute opponents across the upper arc only.
+ * opponentIndex: 0-based index among non-hero players (left-to-right).
+ * totalOpponents: number of opponents (totalSeats - 1).
+ * Returns { x, y } as percentages of the container.
+ */
+export function getMobileSeatPosition(
+  opponentIndex: number,
+  totalOpponents: number,
+): { x: number; y: number } {
+  const angle = Math.PI + ((opponentIndex + 1) / (totalOpponents + 1)) * Math.PI;
+  const rx = 42;
+  const ry = 40;
+  return {
+    x: 50 + rx * Math.cos(angle),
+    y: 50 + ry * Math.sin(angle),
+  };
+}
+
 export function getBetPosition(seatPos: { x: number; y: number }): { x: number; y: number } {
   return {
     x: 50 + (seatPos.x - 50) * 0.5,
