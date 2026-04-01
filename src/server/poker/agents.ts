@@ -12,6 +12,12 @@ import { evaluateHand } from './hand-eval';
 import { Hand } from 'pokersolver';
 import { freshDeck } from './deck';
 import { getSystemBotByBinaryPath, type SystemBotDefinition, type SystemBotStyle } from '@/lib/system-bots';
+// ─── New strategy modules (v2 upgrade) ─────────────────────────────────────
+import { analyzeBoard, type BoardTexture } from './strategy/board-texture';
+import { preflopHandStrength as preflopHandStrengthV2 } from './strategy/preflop-ranges';
+import { adjustForStackDepth } from './strategy/stack-depth';
+import { postflopStrengthMC as postflopStrengthMCV2 } from './strategy/equity';
+import { chooseBalancedAction, type BalancedActionRequest } from './strategy/balanced-strategy';
 
 const BOT_ACTION_TIMEOUT_MS = parseInt(process.env.BOT_ACTION_TIMEOUT_MS ?? '5000', 10);
 const HUMAN_ACTION_TIMEOUT_MS = parseInt(process.env.HUMAN_ACTION_TIMEOUT_MS ?? '30000', 10);
@@ -623,32 +629,60 @@ export class BuiltinBotAgent implements PlayerAgent {
       }
     }
 
-    // ─── GTO (诸葛亮): use mixed strategy frequencies ────────────────────
+    // ─── GTO (诸葛亮): use balanced mixed strategy ─────────────────────
     if (style === 'gto') {
-      const action = chooseGtoAction(this.holeCards, req, this.players.length);
+      const opponents = Math.max(1, this.players.length - 1);
+      const gtoStrength = req.street === 'preflop'
+        ? preflopHandStrengthV2(this.holeCards, this.myPosition, style)
+        : postflopStrengthMCV2(this.holeCards, req.board, opponents);
+      const texture = req.street !== 'preflop' ? analyzeBoard(req.board) : null;
+      const balancedReq: BalancedActionRequest = {
+        street: req.street,
+        board: req.board,
+        pot: req.pot,
+        currentBet: req.currentBet,
+        toCall: req.toCall,
+        minRaise: req.minRaise,
+        stack: req.stack,
+        initialStack: req.initialStack,
+      };
+      const decision = chooseBalancedAction(gtoStrength, balancedReq, texture, this.players.length);
+      const { frequencies } = decision;
       return Promise.resolve({
-        ...action.result,
+        action: decision.action,
+        ...(decision.amount > 0 ? { amount: decision.amount } : {}),
         debug: {
-          equity: action.strength,
-          potOdds: action.potOdds,
-          foldFreq: action.foldFreq,
-          callFreq: action.callFreq,
-          raiseFreq: action.raiseFreq,
-          reasoning: `${this.definition.name}: 均衡策略 [F${Math.round(action.foldFreq * 100)}% C${Math.round(action.callFreq * 100)}% R${Math.round(action.raiseFreq * 100)}%]. ${describeHolding(req.street, this.holeCards, req.board)}.`,
+          equity: decision.strength,
+          potOdds: req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0,
+          foldFreq: frequencies.fold,
+          callFreq: frequencies.call,
+          raiseFreq: frequencies.raise,
+          reasoning: `${this.definition.name}: 均衡策略 [F${Math.round(frequencies.fold * 100)}% C${Math.round(frequencies.call * 100)}% R${Math.round(frequencies.raise * 100)}%] ${decision.reasoning}. ${describeHolding(req.street, this.holeCards, req.board)}.`,
         },
       });
     }
 
     // ─── Standard path (all other styles use the generic engine) ─────────
     const opponents = Math.max(1, this.players.length - 1);
-    const strength = req.street === 'preflop'
-      ? preflopStrength(this.holeCards)
-      : postflopStrengthMC(this.holeCards, req.board, opponents);
+    // v2: position-aware preflop strength + consolidated MC equity
+    const rawStrength = req.street === 'preflop'
+      ? preflopHandStrengthV2(this.holeCards, this.myPosition, style)
+      : postflopStrengthMCV2(this.holeCards, req.board, opponents);
+    // v2: stack-depth adjustment (deep stacks favor speculative hands)
+    const bbCount = req.stack / Math.max(this.bigBlind, 1);
+    const strength = adjustForStackDepth(this.holeCards, rawStrength, bbCount);
+    // v2: board texture analysis (postflop only)
+    const texture: BoardTexture | null = req.street !== 'preflop' ? analyzeBoard(req.board) : null;
     const crowdPenalty = Math.max(0, opponents - 2) * 0.04 * cfg.crowdSensitivity;
     const posFactor = getPositionFactor(this.myPosition) * cfg.positionSensitivity;
     const isLatePosition = this.myPosition === 'BTN' || this.myPosition === 'CO';
     cfg.bluffRate = clamp01(cfg.bluffRate + (isLatePosition ? 0.03 : -0.02) * cfg.positionSensitivity);
     let adjustedStrength = clamp01(strength - crowdPenalty + cfg.looseness * 0.25 + posFactor);
+    // v2: texture-aware bluff adjustment (wet boards = less bluffing, dry = more)
+    if (texture) {
+      if (texture.wetness < 0.25) cfg.bluffRate = clamp01(cfg.bluffRate + 0.03); // bluff more on dry
+      if (texture.wetness > 0.55) cfg.bluffRate = clamp01(cfg.bluffRate - 0.03); // bluff less on wet
+    }
 
     // Multi-street pattern adjustment (lower effective strength when danger patterns detected)
     if (req.toCall > 0) {

@@ -1,417 +1,536 @@
-# Bot Intelligence Upgrade Design
+# Bot Intelligence Upgrade v2 — Competitive-Level Design Spec
 
-## Summary
+**Date:** 2026-04-01
+**Target:** Competitive system bots with distinct personalities (improved heuristic engine, not solver-level)
+**Scope:** Fix dead code, decompose agents.ts into strategy modules, add positional ranges, board texture, per-opponent per-street modeling, geometric sizing, stack-depth awareness, and formula-based balanced strategy engine
+**Reviewed:** Codex adversarial review completed — 10 findings addressed below
 
-Upgrade all 11 built-in system bots from simplistic rule-based decision making to a smarter engine with real equity calculation, position awareness, bet sizing reads, multi-street memory, universal opponent modeling, and a dynamic human pressure module. Each bot retains its distinct personality (nit, tag, lag, etc.) while the decision floor is raised across the board.
+---
 
-## Problem Statement
+## 1. Problem Statement
 
-Current bot weaknesses:
-- **Postflop strength is coarse lookup**: `postflopStrength()` maps hand type names to fixed scores (Pair=0.48, Two Pair=0.65), ignoring within-category variance (top pair vs bottom pair)
-- **Monte Carlo equity exists but is unused**: `monteCarloEquity()` in hand-eval.ts is never called by bot decision logic
-- **No position awareness**: bots don't distinguish BTN from UTG
-- **No bet sizing reads**: bots only see `toCall` absolute value, not whether it's 1/3 pot or 2x pot
-- **No multi-street memory**: each street is decided independently with no history within a hand
-- **Opponent modeling is adaptive-only**: 10 of 11 bots ignore opponent behavior entirely
-- **GTO bot is pseudo-GTO**: fixed frequency distribution without range/position/history consideration
+The current bot strategy engine (`agents.ts`, 1268 lines) has:
 
-## Design Decisions
+1. **Dead code**: `cbetOpportunities`, `foldToCbetCount`, `wtsdCount` in `OpponentStats` are never incremented. Three `computeExploit()` branches never trigger.
+2. **Pooled opponent model**: All opponents averaged into one profile — a nit and maniac at the same table become one "medium" opponent.
+3. **No positional preflop ranges**: `preflopStrength()` gives the same score for AKo from UTG and BTN.
+4. **No board texture analysis**: Strategy doesn't differentiate dry vs. wet boards.
+5. **No stack-depth awareness**: Same hand evaluation at 20BB and 200BB.
+6. **Pseudo-GTO**: `chooseGtoAction` uses MDF + simple curves, not a principled mixed-strategy model.
+7. **Low MC iterations**: 250 samples at 6 opponents — high variance.
+8. **Monolithic file**: All logic in one 1268-line file, untestable in isolation.
 
-- **Approach A (selected)**: Engine-layer upgrade within existing `BuiltinBotAgent`, not a full architectural rewrite
-- **Personality preserved**: `StyleParams` + `STYLE_CONFIG` system retained and extended
-- **Performance budget**: 100-300ms per decision acceptable, unlocking real Monte Carlo equity
-- **Human pressure**: dynamic and adaptive based on opponent skill level, not fixed global parameter
-- **Transparency**: human pressure is not disclosed to players
+## 2. Design Decisions
 
-## Module 1: Real Postflop Equity
+| Dimension | Choice | Rationale |
+|-----------|--------|-----------|
+| Target level | Competitive heuristic (not "GTO") | Honest naming: improved heuristic engine, no solver claims |
+| Code organization | Split into `strategy/` modules | Each module independently testable |
+| Preflop ranges | GTO-informed hardcoded baseline + style offset | Anchored quality + personality differentiation |
+| Opponent modeling | Per-player (userId key) + per-street stats | Stable identity across seat changes (Codex #1 fix) |
+| Balanced strategy | Formula-based approximation | Self-contained, no external solver dependency |
+| Performance | Hard 200ms decision budget | Perf gates per module (Codex #3 fix) |
 
-### Current
-`postflopStrength()` calls `evaluateHand()` and maps the hand name to a fixed score via `madeHandStrength()`, then adds small bonuses for draws.
+## 3. File Structure
 
-### Change
-Replace the lookup-based scoring with actual Monte Carlo equity:
+```
+src/server/poker/
+  agents.ts                    # Thin orchestrator: Agent interfaces + decision pipeline
+                               # Re-exports strategy helpers for test compatibility (Codex #10)
+  strategy/
+    types.ts                   # Shared types (Position, StreetStats, BoardTexture, etc.)
+    style-config.ts            # STYLE_CONFIG + StyleParams type definitions
+    preflop-ranges.ts          # Positional range tables + style offsets
+    board-texture.ts           # Board texture analysis
+    opponent-model.ts          # Per-player OpponentStats + per-street tracking + exploit
+    bet-sizing.ts              # Geometric sizing + texture/SPR adjustments + legal move clamping
+    balanced-strategy.ts       # Formula-based mixed strategy engine (renamed from gto-strategy)
+    stack-depth.ts             # Stack-depth-aware hand evaluation
+    equity.ts                  # Monte Carlo equity (consolidated — replaces agents.ts version)
+  __tests__/
+    preflop-ranges.test.ts
+    board-texture.test.ts
+    opponent-model.test.ts
+    bet-sizing.test.ts
+    balanced-strategy.test.ts
+    stack-depth.test.ts
+    equity.test.ts
+```
 
+## 4. Module Designs
+
+### 4.1 PBP Protocol Changes (Prerequisites)
+
+**Codex review revealed that the current PBP event stream is insufficient for proper opponent modeling.**
+
+Changes to `new_hand` player entries:
 ```typescript
-function postflopStrength(holeCards: [Card, Card], board: Card[]): number {
-  // Run Monte Carlo against 1 random opponent
-  const { equities } = monteCarloEquity([holeCards], board, [], 1500);
-  let equity = equities[0];
-
-  // Draw bonuses still apply as smoothing (MC with 1500 iterations has noise on draws)
-  equity += flushDrawBonus(holeCards, board) * 0.5;  // reduced weight since MC partially captures draws
-  equity += straightDrawBonus(holeCards, board) * 0.5;
-  return clamp01(equity);
-}
-```
-
-**Multi-opponent adjustment**: When facing N opponents, run MC with N random hands instead of 1. The `monteCarloEquity` function already supports this.
-
-```typescript
-// In requestAction, before calling chooseBuiltinAction:
-const opponents = Math.max(1, this.players.filter(p => p.seat !== this.mySeat).length);
-const strength = req.street === 'preflop'
-  ? preflopStrength(this.holeCards)
-  : postflopStrengthMC(this.holeCards, req.board, opponents);
-```
-
-**Performance**: 1500 iterations x pokersolver evaluation ~ 80-200ms. Acceptable per requirements.
-
-**preflopStrength unchanged**: No community cards to simulate against; the existing formula is adequate for preflop.
-
-## Module 2: Position Awareness
-
-### Data Source
-`new_hand` PBP message already includes `buttonSeat` and `players[]`. Combined with `mySeat` and player count, relative position can be derived.
-
-### Position Calculation
-
-```typescript
-type Position = 'EP' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
-
-function calcPosition(mySeat: number, buttonSeat: number, seatList: number[]): Position {
-  // Sort active seats, find distance from button
-  // 1 after button = SB, 2 after = BB, last before button = CO, button = BTN
-  // Remaining split into EP (first third) and MP (rest)
-}
-```
-
-### Position Factor
-
-| Position | Factor | Rationale |
-|----------|--------|-----------|
-| BTN | +0.08 | Best position, act last postflop |
-| CO | +0.06 | Second best |
-| MP | 0.00 | Baseline |
-| EP | -0.06 | First to act, positional disadvantage |
-| SB | -0.06 | Out of position postflop, worst seat |
-| BB | -0.02 | Already invested, defend slightly wider |
-
-### Application
-
-```
-// Preflop: position widens/tightens opening range
-adjustedStrength += positionFactor * (1 - cfg.crowdSensitivity * 0.3)
-
-// Postflop: position affects bluff frequency
-effectiveBluffRate = cfg.bluffRate + (isLatePosition ? 0.03 : -0.02)
-```
-
-### Per-Style Sensitivity
-
-New `StyleParams` field: `positionSensitivity: number` (0-1)
-
-| Style | positionSensitivity | Rationale |
-|-------|-------------------|-----------|
-| nit | 0.5 | Moderate — tighter in EP, but doesn't loosen much in LP |
-| tag | 0.9 | High — textbook position play |
-| lag | 0.7 | Significant but still plays wide everywhere |
-| station | 0.1 | Barely notices |
-| maniac | 0.1 | Doesn't care about position |
-| trapper | 0.6 | Uses position for trap setups |
-| bully | 0.5 | Position matters for bullying effectively |
-| tilter | 0.7 | When calm, respects position; tilted = ignores |
-| shortstack | 0.4 | Push/fold depends more on stack than position |
-| adaptive | 0.8 | Uses position as part of exploit strategy |
-| gto | 0.9 | Position is fundamental to GTO play |
-
-Position factor is multiplied by `positionSensitivity` before application.
-
-## Module 3: Bet Sizing Reads
-
-### Bet Size Ratio
-
-```typescript
-const betSizeRatio = req.toCall / Math.max(req.pot, 1);
-```
-
-### Size Categories and Adjustments
-
-| Category | Ratio | callThreshold multiplier | Meaning |
-|----------|-------|------------------------|---------|
-| small | < 0.4 | 0.85 | Probe/thin value, wide range |
-| medium | 0.4-0.8 | 1.00 | Standard, no adjustment |
-| large | 0.8-1.3 | 1.10 | Polarized range, medium hands devalued |
-| overbet | > 1.3 | 1.20 | Nuts or bluff, medium hands severely devalued |
-
-### Application
-
-```typescript
-const sizingMultiplier = getSizingMultiplier(betSizeRatio);
-const adjustedCallThreshold = callThreshold * lerp(1.0, sizingMultiplier, cfg.sizingSensitivity);
-```
-
-### Per-Style Sensitivity
-
-New `StyleParams` field: `sizingSensitivity: number` (0-1)
-
-| Style | sizingSensitivity | Rationale |
-|-------|------------------|-----------|
-| nit | 0.8 | Respects big bets |
-| tag | 0.7 | Reads sizing well |
-| station | 0.1 | Ignores sizing (calls anyway) |
-| maniac | 0.2 | Reverse — sees big bets as challenge |
-| gto | 0.9 | Sizing-aware defense frequencies |
-| adaptive | 0.8 | Uses sizing as exploit signal |
-| Others | 0.5 | Moderate |
-
-## Module 4: Multi-Street Memory
-
-### Data Structure
-
-```typescript
-interface HandMemory {
-  streetActions: Map<string, Array<{ seat: number; action: ActionType; amount: number }>>;
-}
-```
-
-Populated from `notify(player_action)` and `notify(street)`. Cleared on `notify(new_hand)`.
-
-### Pattern Detection
-
-For a given opponent seat, extract behavioral patterns:
-
-```typescript
-interface OpponentHandPattern {
-  checkThenBet: boolean;    // checked previous street, betting this street
-  betBetBet: boolean;       // bet/raised on all previous streets
-  checkCheckBet: boolean;   // checked 2+ streets then bet
-  timesRaised: number;      // how many times they raised this hand
-}
-```
-
-### Adjustments
-
-| Pattern | Adjustment | Rationale |
-|---------|-----------|-----------|
-| checkThenBet | callThreshold +0.05 | Possible delayed value/trap |
-| betBetBet | medium hands devalued (callThreshold +0.06) | Consistent aggression = strong or committed bluff |
-| checkCheckBet | callThreshold +0.08 | Classic slowplay pattern |
-| timesRaised >= 2 | callThreshold +0.10 | Multiple raises = very strong range |
-
-### Per-Style Utilization
-
-New `StyleParams` field: `patternSensitivity: number` (0-1)
-
-| Style | patternSensitivity | Rationale |
-|-------|-------------------|-----------|
-| adaptive | 1.0 | Maximum pattern reading |
-| gto | 0.7 | Balances patterns with theory |
-| trapper | 0.8 | Recognizes traps (takes one to know one) |
-| tag/nit | 0.6 | Uses patterns defensively |
-| lag/bully | 0.4 | Acknowledges but doesn't overfold |
-| station/maniac | 0.1 | Basically ignores |
-| tilter | 0.5 (decays with tilt) | Loses pattern awareness when tilted |
-
-## Module 5: Universal Opponent Modeling
-
-### Promotion to Base Class
-
-Move existing `opponentStats` tracking from adaptive-specific to `BuiltinBotAgent` base behavior. The tracking code in `notify()` already lives there; the change is making all styles *use* the data.
-
-### Extended Statistics
-
-Add to existing `OpponentStats`:
-
-```typescript
-interface OpponentStats {
-  hands: number;
-  vpip: number;
-  pfr: number;
-  aggActions: number;
-  passActions: number;
-  // New:
-  cbetOpportunities: number;  // times they were preflop raiser and saw a flop
-  cbets: number;              // times they c-bet
-  foldToCbetCount: number;    // times they folded to a c-bet
-  foldToCbetOpportunities: number;
-  wtsdCount: number;          // went to showdown
-  wtsdOpportunities: number;  // saw flop (could have gone to SD)
-}
-```
-
-### Exploit Weight
-
-New `StyleParams` field: `exploitWeight: number` (0-1)
-
-Controls how much opponent stats influence decisions:
-
-| Style | exploitWeight | Usage Pattern |
-|-------|-------------|---------------|
-| nit (司马懿) | 0.3 | Defensive only — avoids traps |
-| tag (赵云) | 0.7 | Balanced exploit — tighter vs loose, steals vs tight |
-| lag (孙悟空) | 0.7 | Attack exploits — c-bets vs high fold-to-cbet |
-| station (猪八戒) | 0.1 | Nearly ignores (still calls) |
-| maniac (张飞) | 0.3 | Reverse exploit — targets tight/passive players |
-| trapper (王熙凤) | 0.6 | Sets targeted traps vs aggressive opponents |
-| bully (鲁智深) | 0.5 | Identifies weak players to pressure |
-| tilter (林冲) | 0.5 | Decays toward 0 as tilt increases |
-| shortstack (燕青) | 0.4 | Adjusts push/fold range vs opponent tendencies |
-| adaptive (曹操) | 1.0 | Maximum exploitation (existing behavior, expanded) |
-| gto (诸葛亮) | 0.2 | Micro-adjustments only — stays near equilibrium |
-
-### Application
-
-```typescript
-// Generic exploit adjustment example
-const oppProfile = getOpponentProfile(targetSeat);
-if (oppProfile.hands >= 8) {
-  const exploit = computeExploit(oppProfile, cfg); // returns adjustments
-  cfg.aggression += exploit.aggressionDelta * cfg.exploitWeight;
-  cfg.bluffRate += exploit.bluffDelta * cfg.exploitWeight;
-  cfg.callThreshold += exploit.callDelta * cfg.exploitWeight;
-}
-```
-
-The `computeExploit` function encodes standard poker exploits:
-- vs high VPIP + low AF (calling station): reduce bluffs, increase value bet frequency
-- vs low VPIP (nit): increase steal frequency, reduce value range
-- vs high fold-to-cbet: always c-bet
-- vs low fold-to-cbet: only c-bet with value
-- vs high AF (aggro): trap more, check-raise more
-- vs high WTSD: value bet thinner, don't bluff
-
-## Module 6: Human Pressure
-
-### Identifying Humans
-
-Extend `new_hand` PBP message with player metadata:
-
-```typescript
-// In PBP new_hand message, players array gains:
 players: Array<{
-  seat: number;
-  displayName: string;
-  stack: number;
-  isBot: boolean;   // NEW
-  elo?: number;     // NEW — only for human players
+  seat: number
+  playerId: string     // NEW — stable user ID, survives seat changes
+  displayName: string
+  stack: number
+  isBot: boolean
+  elo?: number
 }>
 ```
 
-**TableManager** populates these fields when constructing the `new_hand` message. It already knows agent types per seat. Elo comes from the `users` table (already queried at seat time).
-
-**state-machine.ts is NOT modified** — it doesn't generate PBP messages, TableManager does.
-
-### Skill Level Assessment
-
+New PBP message type — `showdown_result` (sent after `hand_over`):
 ```typescript
-type HumanSkillLevel = 'low' | 'mid' | 'high';
-
-function assessHumanSkill(elo: number | undefined, stats: OpponentStats | undefined): HumanSkillLevel {
-  const eloScore = elo ?? 1200;
-  if (stats && stats.hands >= 20) {
-    const vpipRate = stats.vpip / stats.hands;
-    const af = stats.passActions > 0 ? stats.aggActions / stats.passActions : 1;
-    if (eloScore < 1100 || vpipRate > 0.55 || af < 0.5) return 'low';
-    if (eloScore > 1400 && vpipRate >= 0.22 && vpipRate <= 0.38 && af > 1.5) return 'high';
-  } else {
-    if (eloScore < 1100) return 'low';
-    if (eloScore > 1400) return 'high';
-  }
-  return 'mid';
+{
+  type: 'showdown_result'
+  players: Array<{ seat: number, cards: [string, string] }>  // All players who reached showdown
 }
 ```
 
-### Pressure Calculation
+This enables WTSD tracking: any player in `showdown_result.players` went to showdown.
+
+**Impact:** `TableManager` constructs PBP messages — this is a TableManager change, not a state machine change. External bots (PBP protocol users) gain richer data. The state machine remains pure.
+
+### 4.2 Bug Fix: cbet/WTSD Statistics (`opponent-model.ts`)
+
+**Root cause:** `notify()` in the current `BuiltinBotAgent` only tracks preflop VPIP/PFR and postflop aggregate agg/pass counts. It never increments cbet, fold-to-cbet, or WTSD counters.
+
+**Fix — precise cbet definition (Codex #2 fix):**
+- **cbet opportunity**: The preflop aggressor (last raiser preflop) makes a bet on the flop. This applies regardless of action order (IP or OOP). NOT triggered in limp pots (no preflop raiser). NOT triggered on donk bets (non-raiser betting first).
+- **fold-to-cbet**: A non-raiser faces a cbet on the flop. If they fold, `foldToCbetCount++`.
+- **WTSD**: Tracked via `showdown_result` PBP message. Any player present in `showdown_result.players` increments `wtsdCount`. `wtsdOpportunity` incremented for any player who sees the flop.
+
+**Edge case definitions (Codex #9 fix):**
+- Limp pots: No player is tagged as preflop aggressor → no cbet tracking on flop
+- 3-bet pots: The 3-bettor is the preflop aggressor
+- Donk bets (non-raiser betting into raiser): NOT a cbet — tracked as regular postflop aggression
+- All-in preflop → no postflop streets → no cbet/street tracking (only WTSD via showdown_result)
+- Folded-before-flop players: Not included in wtsdOpportunities
+- Flop check-through: If preflop aggressor checks, `cbetOpportunity++` but NOT `cbets++`
+
+### 4.3 Per-Player Opponent Modeling (`opponent-model.ts`)
+
+**Codex #1 fix:** Key by `playerId` (stable user ID), not `seatIndex`.
+
+**Current:** `getAverageOpponentProfile()` pools all opponents into one stat block.
+
+**New:** `Map<playerId, OpponentStats>` with per-player, per-street tracking. Stats survive seat changes and carry across hands at the same table.
 
 ```typescript
-function calcHumanPressure(skill: HumanSkillLevel, style: SystemBotStyle): number {
-  const base: Record<HumanSkillLevel, number> = {
-    low: 0.08,
-    mid: 0.05,
-    high: 0.01,
-  };
+interface StreetStats {
+  bets: number
+  checks: number
+  calls: number
+  raises: number
+  folds: number
+}
 
-  const cap: Partial<Record<SystemBotStyle, number>> = {
-    station: 0.05,
-    maniac: 0.05,
-    nit: 0.12,
-  };
-
-  const pressure = base[skill] + 0.03; // +0.03 base for facing any human
-  const maxPressure = cap[style] ?? 0.10;
-  return Math.min(pressure, maxPressure);
+interface OpponentStats {
+  playerId: string
+  hands: number
+  vpip: number
+  pfr: number
+  streets: Record<'preflop' | 'flop' | 'turn' | 'river', StreetStats>
+  cbetOpportunities: number
+  cbets: number
+  foldToCbetOpportunities: number
+  foldToCbetCount: number
+  wtsdOpportunities: number
+  wtsdCount: number
 }
 ```
 
-### Application
+**Derived stats (computed, not stored):**
+- `aggFactor(street)` = `(bets + raises) / max(1, calls)` per street
+- `cbetRate` = `cbets / max(1, cbetOpportunities)`
+- `foldToCbetRate` = `foldToCbetCount / max(1, foldToCbetOpportunities)`
+- `wtsdRate` = `wtsdCount / max(1, wtsdOpportunities)`
 
-Human pressure is applied as the **final adjustment layer**, after all other modules:
+**Exploit computation:** `computeExploit(targetPlayerId, cfg)` queries the individual opponent's stats. In multi-way pots, target the most relevant opponent (last aggressor, or positionally next to act).
+
+**Per-street exploit additions:**
+- Opponent flop AF > 2.5 but turn AF < 0.8 → "bluff-then-give-up" → increase flop float frequency
+- Opponent turn AF > 2.0 and river AF > 2.0 → "double/triple barrel" → tighten later-street calling range
+
+**Minimum sample sizes:** Exploit adjustments only activate with ≥8 hands total. Per-street exploits require ≥5 observations on the relevant street. Below threshold, use defaults (current behavior).
+
+### 4.4 Positional Preflop Ranges (`preflop-ranges.ts`)
+
+**Data structure:** 169-combo matrix (13x13: diagonal=pairs, upper-triangle=suited, lower-triangle=offsuit).
 
 ```typescript
-// In requestAction, after all other adjustments:
-const humanSeats = this.players.filter(p => !p.isBot && p.seat !== this.mySeat);
-if (humanSeats.length > 0) {
-  // Use the weakest human at the table for pressure calculation
-  const weakest = humanSeats.reduce((a, b) =>
-    assessHumanSkill(a.elo, this.opponentStats.get(a.seat)) <= assessHumanSkill(b.elo, this.opponentStats.get(b.seat)) ? a : b
-  );
-  const pressure = calcHumanPressure(
-    assessHumanSkill(weakest.elo, this.opponentStats.get(weakest.seat)),
-    this.definition.style
-  );
-  cfg.aggression = clamp01(cfg.aggression + pressure);
-  cfg.bluffRate = clamp01(cfg.bluffRate + pressure * 0.5);
-  // Slightly lower call threshold vs humans (harder to bluff us out)
-  callThresholdAdjustment -= pressure * 0.3;
+type HandCombo = string  // "AKs", "QTo", "88"
+type RangeTable = Map<HandCombo, number>  // combo → frequency 0~1
+
+interface PositionalRanges {
+  RFI: Record<Position, RangeTable>       // Open-raise ranges by position
+  vs3Bet: Record<Position, RangeTable>    // Continue vs 3bet ranges
 }
 ```
 
-### Key Constraint
+**GTO-informed baseline (6-max 100BB):**
 
-Human pressure is capped at 0.15 max to avoid detectable behavioral anomalies. The adjustments are subtle enough that statistical analysis would require thousands of hands to distinguish from normal variance.
+| Position | RFI % | Boundary examples |
+|----------|-------|-------------------|
+| UTG | ~15% | 77+, ATo+, ATs+, KQs, KJs |
+| MP | ~18% | 66+, A9o+, A8s+, KQo, KTs+ |
+| CO | ~27% | 55+, A5o+, A2s+, KTo+, K8s+, QTo+, Q9s+, J9s+, T9s |
+| BTN | ~42% | 22+, A2+, K5o+, K2s+, Q8o+, Q5s+, J8o+, J7s+, T8o+ |
+| SB | ~36% | Similar to BTN, slightly tighter |
+| BB | ~40-55% defend | Based on MDF vs opener position |
 
-## Extended StyleParams
-
-Final `StyleParams` interface after all modules:
+**Style offset system:**
 
 ```typescript
-interface StyleParams {
-  label: string;
-  aggression: number;
-  looseness: number;
-  bluffRate: number;
-  raiseBias: number;
-  crowdSensitivity: number;
-  slowplayRate: number;
-  checkRaiseRate: number;
-  // New:
-  positionSensitivity: number;   // Module 2
-  sizingSensitivity: number;     // Module 3
-  patternSensitivity: number;    // Module 4
-  exploitWeight: number;         // Module 5
+interface StyleRangeModifier {
+  rfiShift: number       // Positive = loosen, negative = tighten
+  premiumBoost: number   // 3bet frequency adjustment for premium hands
+  suitedBonus: number    // Extra inclusion for suited hands
+  speculative: number    // Extra inclusion for small pairs + suited connectors
 }
 ```
 
-Human pressure caps are derived from style, not stored as a param (Module 6).
+Example offsets:
+- **nit**: `rfiShift=-0.15` → UTG ~8%, BTN ~28%
+- **lag**: `rfiShift=+0.12, speculative=+0.20` → BTN ~55%+
+- **maniac**: `rfiShift=+0.25` → most positions 50%+
+- **station**: `rfiShift=+0.18, premiumBoost=-0.10` → calls everything, rarely 3bets
 
-## Files Modified
+**Interface:**
 
-| File | Change |
-|------|--------|
-| `src/server/poker/agents.ts` | Main: all 6 modules, extended StyleParams, STYLE_CONFIG values |
-| `src/server/poker/hand-eval.ts` | No change (monteCarloEquity already exists) |
-| `src/server/table-manager.ts` | Populate `isBot` and `elo` in new_hand PBP message |
-| `src/lib/types.ts` | Extend PBP `new_hand` player type with `isBot` and `elo` fields |
+```typescript
+function getPreflopAction(
+  cards: [string, string],
+  position: Position,
+  style: SystemBotStyle,
+  context: { facing3Bet: boolean, raisersAhead: number, stackBB: number }
+): { action: 'fold' | 'call' | 'raise', frequency: number }
 
-## Files NOT Modified
+// Replaces current preflopStrength() — still returns 0~1 but position-aware
+function preflopHandStrength(
+  cards: [string, string],
+  position: Position,
+  style: SystemBotStyle
+): number
+```
 
-| File | Reason |
-|------|--------|
-| `src/server/poker/state-machine.ts` | Pure state machine — no I/O, no bot logic |
-| `src/server/poker/pot.ts` | Financial logic unchanged |
-| `src/server/ws.ts` | WebSocket privacy model unchanged |
-| `src/lib/system-bots.ts` | Bot definitions unchanged |
+### 4.5 Board Texture Analysis (`board-texture.ts`)
 
-## Testing Strategy
+```typescript
+interface BoardTexture {
+  wetness: number                                           // 0 (K72r) ~ 1 (JTs9hh)
+  pairedness: 'none' | 'paired' | 'trips'
+  flushDraw: 'none' | 'backdoor' | 'possible' | 'monotone'
+  straightDraw: 'none' | 'backdoor' | 'open' | 'connected'
+  highCard: number                                          // Highest rank on board
+  connectivity: number                                      // 0~1, how connected the ranks are
+}
 
-1. **Unit tests for each module**: position calculation, bet sizing classification, pattern detection, exploit computation, human pressure calculation
-2. **Integration test**: full hand simulation with upgraded bots, verify chip conservation still holds
-3. **Regression**: run existing pot.ts tests (15+ cases) — must all pass
-4. **Behavioral smoke test**: verify each bot style still exhibits its characteristic behavior (nit folds most, maniac raises most, etc.)
-5. **Performance test**: measure decision latency with MC equity — must stay under 300ms
+function analyzeBoard(board: string[]): BoardTexture
+```
 
-## Risk Mitigation
+**Wetness formula:**
+```
+wetness = flushComponent + straightComponent + pairComponent
+  flushComponent:    monotone=0.4, possible=0.25, backdoor=0.10, none=0
+  straightComponent: connected=0.35, open=0.25, backdoor=0.10, none=0
+  pairComponent:     trips=0.15, paired=0.10, none=0
+  // Clamped to [0, 1]
+```
 
-- **MC performance**: If pokersolver proves too slow at 1500 iterations, reduce to 800 or implement card-rank caching
-- **agents.ts size**: File will grow significantly. If it exceeds ~800 lines, extract modules into `src/server/poker/bot-brain/` (natural evolution toward Approach B)
-- **Human pressure detection**: Cap at 0.15 and apply gradually. Monitor through debug panel — the `reasoning` field in BotDebugInfo already shows decision factors
+**Strategy impact:**
+
+| Texture | cbet frequency | cbet size | Check-raise freq |
+|---------|---------------|-----------|-----------------|
+| Dry (wetness < 0.25) | High (70-80%) | Small (33% pot) | Low |
+| Medium (0.25-0.55) | Medium (50-65%) | Medium (50-60% pot) | Medium |
+| Wet (wetness > 0.55) | Low (35-50%) | Large (67-75% pot) | High |
+| Paired | High (75%+) | Small (25-33% pot) | Low |
+| Monotone | Low (30-40%) | Large (75% pot) | High with FD |
+
+**Performance:** Pure computation on 3-5 cards — sub-microsecond. No perf concern.
+
+### 4.6 Bet Sizing (`bet-sizing.ts`)
+
+**Geometric sizing model:**
+
+Given pot size, remaining stack, and streets left, calculate the bet size that naturally commits all chips by river:
+
+```
+geometricBetFraction(pot, stack, streetsLeft) =
+  (stack/pot + 1)^(1/streetsLeft) - 1
+
+// Example: pot=100, stack=300, 3 streets → ~59% pot each street
+// Example: pot=100, stack=150, 2 streets → ~58% pot each street
+```
+
+**Adjustments on geometric base:**
+
+| Factor | Multiplier |
+|--------|-----------|
+| Dry board | x 0.55 |
+| Wet board | x 1.25 |
+| Monotone | x 1.35 |
+| SPR < 3 | Shove directly |
+| SPR < 1.5 | Always shove |
+| Value hand (strength > 0.80) | x 1.10 |
+| Bluff | x 1.15 (need fold equity) |
+
+**Style modifiers:** maniac +20%, nit -20%, lag +10%.
+
+**Legal move clamping (Codex #6 fix):**
+
+All bet sizes MUST be clamped to the state machine's legal constraints:
+```typescript
+function clampToLegal(
+  desiredAmount: number,
+  minRaise: number,      // from ActionRequest
+  currentBet: number,    // from ActionRequest
+  stack: number,         // player's remaining stack
+  raiseCap?: number      // max raises per street (from state machine)
+): { action: 'raise' | 'call' | 'check', amount: number }
+```
+
+Rules:
+- If `desiredAmount < minRaise` → either call (if desired was a thin raise) or raise to `minRaise`
+- If `desiredAmount > stack` → all-in
+- If raise cap reached → call instead of raise
+- Incomplete all-in raises that don't meet minRaise are still legal (all-in exception) but don't reopen action
+
+**Interface:**
+
+```typescript
+function chooseBetSize(
+  pot: number,
+  stack: number,
+  streetsRemaining: number,
+  texture: BoardTexture,
+  strength: number,
+  style: SystemBotStyle,
+  isBluff: boolean,
+  legalConstraints: { minRaise: number, currentBet: number, raiseCap?: number }
+): { amount: number, action: 'raise' | 'call' | 'check' }
+
+function shouldShove(stack: number, pot: number, currentBet: number): boolean
+```
+
+### 4.7 Stack-Depth Awareness (`stack-depth.ts`)
+
+```typescript
+function adjustForStackDepth(
+  hand: [string, string],
+  strengthRaw: number,
+  stackBB: number,
+  handCategory: 'premium' | 'broadway' | 'suited-connector' | 'small-pair' | 'suited-gapper' | 'offsuit'
+): number
+```
+
+**Adjustment table:**
+
+| Stack depth | Premium | Broadway | Suited connectors | Small pairs | Bare offsuit |
+|-------------|---------|----------|-------------------|-------------|-------------|
+| <=15BB | +0.00 | +0.03 | -0.06 | -0.04 | +0.02 |
+| 16-25BB | +0.00 | +0.02 | -0.03 | -0.02 | +0.01 |
+| 26-60BB | +0.00 | +0.00 | +0.00 | +0.00 | +0.00 |
+| 61-100BB | +0.00 | -0.01 | +0.03 | +0.03 | -0.01 |
+| 100BB+ | +0.00 | -0.03 | +0.06 | +0.06 | -0.03 |
+
+**Key principle:** Deep stacks favor speculative hands (set-mining, straight/flush potential with implied odds). Shallow stacks favor raw equity. Push/fold at <=15BB applies to ALL styles (not just shortstack).
+
+**Performance:** Pure arithmetic — sub-microsecond. No perf concern.
+
+### 4.8 Balanced Strategy Engine (`balanced-strategy.ts`)
+
+*Renamed from `gto-strategy.ts` — this is an improved heuristic engine using game-theory-informed principles, not a solver (Codex #8 fix).*
+
+**Core concepts:**
+
+1. **MDF (Minimum Defense Frequency):**
+   ```
+   MDF = 1 - betSize / (pot + betSize)
+   ```
+
+2. **Polarized bet range model:**
+   ```
+   valueCutoff = 1 - (betSize / (pot + 2*betSize))  // Top X%
+   bluffRatio  = betSize / (pot + betSize)           // Bluffs per value bet
+   bluffFloor  = bluffRatio * valueCutoff             // Bottom Y% used as bluffs
+   ```
+   Hands between value and bluff → check (protection + pot control).
+
+3. **Geometric bet sizing** from `bet-sizing.ts`, texture-adjusted, **clamped to legal moves**.
+
+4. **Frequency-based action selection:**
+   Every decision point outputs `{ raise: p1, call: p2, fold: p3 }` probabilities, random roll selects action. No hard thresholds.
+
+5. **Board texture integration:**
+   Dry boards → higher cbet frequency, smaller size, more range-betting.
+   Wet boards → lower cbet frequency, larger size, more polarized.
+
+6. **SPR-aware simplification:**
+   - SPR < 2: binary (shove or fold/check)
+   - SPR 2-4: two-street model (bet-bet or bet-shove)
+   - SPR > 4: full multi-street geometric model
+
+**No-bet decision flow:**
+```
+if SPR < 2 and strength > 0.40 → shove
+if strength > valueCutoff → bet (geometric size, texture-adjusted, legally clamped)
+if strength < bluffFloor and roll(bluffFreq) → bet (same size for balance)
+else → check
+```
+
+**Facing-bet decision flow:**
+```
+continueFreq = max(MDF, strengthBasedContinue)
+raiseFreq    = polarized raise range (top of continue + bluffs)
+callFreq     = continueFreq - raiseFreq
+foldFreq     = 1 - continueFreq
+roll → raise | call | fold
+```
+
+**Relationship to styles:**
+- `gto` style: 100% this engine (renamed internally, same bot personality)
+- `adaptive` style: this engine as baseline, then `exploitWeight * computeExploit()` deltas applied to frequencies
+
+### 4.9 Equity Module (`equity.ts`)
+
+**Consolidated — single source of truth (Codex #5 fix):**
+
+`strategy/equity.ts` replaces the inline `postflopStrengthMC()` from `agents.ts`. The `monteCarloEquity()` in `hand-eval.ts` remains for UI display purposes but internally calls the same core simulation function from `equity.ts`.
+
+**Iteration count upgrade:**
+```
+iterations = max(800, round(2000 / opponents))
+// 1 opponent: 2000, 2 opponents: 1000, 3+: 800 minimum
+// Previous: max(500, round(1500 / opponents)) → 250 at 6 opponents
+```
+
+**Performance budget (Codex #3 fix):** MC equity is the most expensive computation. At 2000 iterations with pokersolver: ~80-150ms. If this exceeds the 200ms total budget after adding other modules, reduce to `max(600, round(1500 / opponents))`. Perf test gate: `equity.test.ts` must include a latency assertion.
+
+**Draw bonus retained** (variance smoothing):
+- Flush draw (4 to suit): +0.04
+- Backdoor flush (3 to suit on flop): +0.015
+- OESD (4 in window): +0.035
+- Backdoor straight (3 in window on flop): +0.01
+
+## 5. Style-Specific Overrides Preservation (Codex #7 fix)
+
+**The following bespoke style behaviors are preserved as pipeline step 2, not absorbed into generic modules:**
+
+### Bully
+- Computes `stackRatio = myStack / avgOpponentStack`
+- If ratio > 1.5: boosts aggression, looseness, bluffRate proportionally (capped +0.30 on aggression)
+- This override happens BEFORE opponent modeling and ranges — it's a meta-strategy
+
+### Tilter
+- Tracks last 8 `hand_over` results
+- Tilt level = `min(1, recentLosses / 5 * 1.2)` over last 5 results
+- When tilted: aggression up to +0.40, looseness +0.30, bluffRate +0.15, raiseBias +0.25
+- `patternSensitivity` decays with tilt (loses ability to read opponents)
+
+### Shortstack
+- At <=15BB preflop: pure push/fold decision bypasses the entire main engine
+- Uses `preflopHandStrength()` from range system (upgraded) with position+stack-aware threshold
+- No ICM (out of scope) but correct push/fold math for chip-EV
+
+### All styles at <=15BB
+- Stack-depth module triggers push/fold consideration for ALL styles, but only `shortstack` fully bypasses the engine. Other styles get strength adjustments that make them more likely to shove/fold but still go through the normal pipeline.
+
+## 6. Decision Pipeline (Revised `agents.ts`)
+
+After refactoring, `agents.ts` becomes a thin orchestrator:
+
+```
+BuiltinBotAgent.requestAction(req):
+  1. Safety check — no hole cards → fold/check
+  2. Style pre-overrides — bully(stack ratio), tilter(tilt level), shortstack(push/fold bypass)
+  3. Opponent exploit — opponentModel.computeExploit(currentOpponentPlayerId, cfg)
+  4. Balanced strategy early exit — if style=gto → balancedStrategy.choose(...)
+  5. Strength calculation:
+     - Preflop: preflopRanges.preflopHandStrength(cards, position, style)
+     - Postflop: equity.postflopStrengthMC(cards, board, opponents)
+  6. Board texture — boardTexture.analyze(board)  [postflop only]
+  7. Stack depth adjustment — stackDepth.adjust(hand, strength, stackBB, category)
+  8. Existing adjustments — crowd penalty, position factor, pattern detection, human pressure
+  9. Action selection — betSizing.chooseAction(..., legalConstraints)
+```
+
+**Total budget: <200ms.** Breakdown target:
+- MC equity (step 5): <150ms
+- All other steps combined: <50ms (pure arithmetic/lookups)
+
+## 7. Testing Strategy
+
+### Characterization tests FIRST (Codex #4 fix)
+
+Before any extraction, write characterization tests that capture current behavior:
+- Snapshot tests: given specific (cards, board, style, opponent stats) → record exact action output
+- Statistical tests: over 1000 hands, each style's aggression/looseness/fold rates fall within expected bands
+- These tests become the regression gate for Phase 1 extraction
+
+### Per-module unit tests
+
+| Module | Test focus |
+|--------|-----------|
+| `preflop-ranges` | Range boundaries per position, style offsets produce correct widening/tightening, 3bet ranges subset of RFI |
+| `board-texture` | Known boards produce expected classifications (K72r=dry, JTs9hh=wet, 882r=paired-dry) |
+| `opponent-model` | cbet/WTSD counters increment correctly per edge case definitions (4.2), per-street AF, exploit outputs |
+| `bet-sizing` | Geometric formula, texture adjustments, SPR shove, **legal move clamping** (minRaise, raise cap) |
+| `balanced-strategy` | MDF calculation, value/bluff range splits, frequency normalization, SPR simplification |
+| `stack-depth` | Speculative hands gain value deep, lose value shallow |
+| `equity` | MC convergence at different iteration counts, **latency < 150ms assertion** |
+
+### Test import compatibility (Codex #10 fix)
+
+Phase 1: `agents.ts` re-exports all strategy helpers from `strategy/` modules:
+```typescript
+// agents.ts — compatibility re-exports
+export { STYLE_CONFIG, type StyleParams } from './strategy/style-config'
+export { postflopStrengthMC } from './strategy/equity'
+// etc.
+```
+
+Phase 4: Migrate test imports to `strategy/` paths, remove re-exports.
+
+## 8. Migration Strategy (Revised per Codex #4)
+
+1. **Phase 1: Characterization tests** — Write snapshot + statistical tests capturing current behavior for all 11 styles. These are the regression gate.
+2. **Phase 2: Extract (behavior-preserving)** — Move code into `strategy/` modules. `agents.ts` re-exports for compatibility. Fix cbet/WTSD counters. Add PBP `playerId` + `showdown_result`. ALL characterization tests must pass.
+3. **Phase 3: New modules** — Add board texture, positional ranges, stack depth, geometric sizing one module at a time. Each module has its own tests. Characterization test bands may widen but style differentiation must hold.
+4. **Phase 4: Balanced strategy rewrite** — Replace `chooseGtoAction` with new engine. Validate with dedicated tests. Migrate test imports.
+5. **Phase 5: Integration tuning** — Wire everything through revised pipeline. Run full test suite. Tune thresholds via bot-vs-bot simulation.
+
+## 9. Performance Gates (Codex #3 fix)
+
+| Component | Budget | Measurement |
+|-----------|--------|-------------|
+| MC equity (postflop) | <150ms | `equity.test.ts` latency assertion |
+| Preflop range lookup | <1ms | Pure lookup, no assertion needed |
+| Board texture | <0.1ms | Pure computation |
+| Opponent model query | <1ms | Map lookup + arithmetic |
+| Bet sizing | <1ms | Arithmetic + clamping |
+| Balanced strategy | <5ms | Frequency computation + roll |
+| **Total decision** | **<200ms** | `bot-perf.test.ts` end-to-end assertion |
+
+If MC equity exceeds budget: reduce iterations to `max(600, round(1500 / opponents))`.
+If total exceeds budget: profile and optimize the bottleneck before adding more modules.
+
+## 10. Out of Scope
+
+- CFR solver / Nash equilibrium computation
+- ICM for tournaments
+- External solver data import (ranges are hardcoded)
+- Real-time Bayesian range narrowing
+- New bot styles (11 existing styles retained and enhanced)
+
+## 11. Codex Review Resolution Log
+
+| # | Finding | Resolution |
+|---|---------|------------|
+| 1 | Seat-keyed model smears stats across players | Changed to `playerId` key (Section 4.3) |
+| 2 | cbet definition wrong + WTSD needs PBP change | Fixed cbet definition + added `showdown_result` PBP message (Sections 4.1, 4.2) |
+| 3 | No runtime budget | Added 200ms hard budget + per-component gates (Section 9) |
+| 4 | Migration plan fake | Added characterization tests as Phase 1, separated extract from upgrade (Section 8) |
+| 5 | Third equity implementation | Consolidated: `equity.ts` is single source, `hand-eval.ts` delegates (Section 4.9) |
+| 6 | Sizing ignores state machine constraints | Added `clampToLegal()` with minRaise/raiseCap/all-in rules (Section 4.6) |
+| 7 | Style personalities flattened | Preserved bespoke overrides as pipeline step 2 with per-style documentation (Section 5) |
+| 8 | "GTO" and "NL50" are marketing | Renamed to `balanced-strategy.ts`, removed solver claims (Sections 2, 4.8) |
+| 9 | Opponent model edge cases undefined | Defined cbet/WTSD for limp/donk/3bet/all-in/fold-before-flop cases (Section 4.2) |
+| 10 | Test import breakage | Re-export compatibility in Phase 2, migrate in Phase 4 (Section 7) |
