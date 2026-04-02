@@ -25,7 +25,7 @@ describe('STYLE_CONFIG intelligence fields', () => {
 
 describe('Position awareness', () => {
   // 6-player table, seats [0,1,2,3,4,5], button=3
-  // Order after button: 4=SB, 5=BB, 0=EP, 1=MP, 2=CO, 3=BTN
+  // Order after button: 4=SB, 5=BB, 0=UTG, 1=MP, 2=CO, 3=BTN
   it('calculates BTN position correctly', () => {
     expect(calcPosition(3, 3, [0, 1, 2, 3, 4, 5])).toBe('BTN');
   });
@@ -38,8 +38,8 @@ describe('Position awareness', () => {
     expect(calcPosition(5, 3, [0, 1, 2, 3, 4, 5])).toBe('BB');
   });
 
-  it('calculates EP position correctly', () => {
-    expect(calcPosition(0, 3, [0, 1, 2, 3, 4, 5])).toBe('EP');
+  it('calculates UTG position correctly', () => {
+    expect(calcPosition(0, 3, [0, 1, 2, 3, 4, 5])).toBe('UTG');
   });
 
   it('calculates CO position correctly', () => {
@@ -61,7 +61,7 @@ describe('Position awareness', () => {
     expect(getPositionFactor('BTN')).toBe(0.08);
     expect(getPositionFactor('CO')).toBe(0.06);
     expect(getPositionFactor('MP')).toBe(0);
-    expect(getPositionFactor('EP')).toBe(-0.06);
+    expect(getPositionFactor('UTG')).toBe(-0.06);
     expect(getPositionFactor('SB')).toBe(-0.06);
     expect(getPositionFactor('BB')).toBe(-0.02);
   });
