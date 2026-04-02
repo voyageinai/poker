@@ -372,20 +372,20 @@ export function getPreflopActionCFR(
     return { action: 'raise', frequency: 0.95 };
   }
 
-  // (b) Garbage override: if GTO says fold >96% AND the style isn't
-  //     inherently loose (station/maniac), force fold.
-  //     Station ("什么牌都想看看") and maniac ("逢牌必加") SKIP this check
-  //     because their whole identity is playing garbage hands.
-  // Style-dependent garbage thresholds:
-  // - station: "什么牌都想看看" → almost never forced to fold (threshold 100%)
-  // - maniac: "逢牌必加" when unopened, but facing raises has a floor (99%)
-  // - other styles: standard threshold (96%)
-  const garbageThreshold = style === 'station' ? 1.01  // station: never forced fold
-    : style === 'maniac' ? 0.965                        // maniac: fold the very worst garbage facing raises
-    : 0.96;                                              // others: standard
+  // (b) Garbage override for FACING ACTION only.
+  //     For UNOPENED pots the style deviation system (rangeScale, foldShift, etc.)
+  //     already defines each style's opening range — selectAction() naturally folds
+  //     garbage for tight styles and opens wide for loose ones.  No override needed.
+  //     For FACING ACTION, use raw GTO fold frequency as a sanity cap so that even
+  //     LAG/maniac don't call raises with 72o.
+  if (actionSeq !== 'unopened') {
+    const garbageThreshold = style === 'station' ? 1.01  // station: never forced fold
+      : style === 'maniac' ? 0.965                        // maniac: fold the very worst garbage facing raises
+      : 0.96;                                              // others: standard
 
-  if (gto.fold > garbageThreshold && result.action !== 'fold') {
-    return { action: 'fold', frequency: gto.fold };
+    if (gto.fold > garbageThreshold && result.action !== 'fold') {
+      return { action: 'fold', frequency: gto.fold };
+    }
   }
 
   // (d) Facing 3bet+: tighter threshold.
