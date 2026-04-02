@@ -654,10 +654,12 @@ function concludeHand(
   if (!winner) return [];
 
   rebuildPot(state);
-  // Subtract uncalled bet: winner's excess over the next-highest totalBet
+  // Winner gets the entire pot back (including their own bets).
+  // The "uncalled bet" is the excess the winner bet beyond what anyone matched —
+  // it's already in the pot total and must be returned to the winner's stack.
   const uncalled = calcUncalledBet(state);
-  const pot = state.pot.total - uncalled;
-  winner.stack += pot;
+  const contestedPot = state.pot.total - uncalled;
+  winner.stack += state.pot.total; // return ALL chips: own bet + opponents' contributions
 
   state.status = 'hand_complete';
   state.activeSeat = -1;
@@ -665,8 +667,8 @@ function concludeHand(
   return [
     {
       kind: 'hand_complete',
-      winners: [{ seat: winningSeat, userId: winner.userId, displayName: winner.displayName, amountWon: pot, potDescription: 'main pot' }],
-      pot,
+      winners: [{ seat: winningSeat, userId: winner.userId, displayName: winner.displayName, amountWon: contestedPot, potDescription: 'main pot' }],
+      pot: contestedPot,
     },
   ];
 }
