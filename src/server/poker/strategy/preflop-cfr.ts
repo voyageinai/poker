@@ -48,10 +48,10 @@ const RANK_ORDER = '23456789TJQKA';
 
 const STYLE_DEVIATIONS: Record<SystemBotStyle, StyleDeviation> = {
   gto:        { rangeScale: 1.0,  foldShift: 0,      raiseShift: 0,      callShift: 0 },
-  nit:        { rangeScale: 0.6,  foldShift: +0.25,  raiseShift: -0.05,  callShift: -0.20 },
+  nit:        { rangeScale: 0.40, foldShift: +0.30,  raiseShift: -0.10,  callShift: -0.20 },
   tag:        { rangeScale: 0.85, foldShift: +0.08,  raiseShift: +0.02,  callShift: -0.10 },
   lag:        { rangeScale: 1.2,  foldShift: -0.15,  raiseShift: +0.15,  callShift: 0 },
-  station:    { rangeScale: 1.0,  foldShift: -0.30,  raiseShift: -0.15,  callShift: +0.45 },
+  station:    { rangeScale: 1.6,  foldShift: -0.50,  raiseShift: -0.20,  callShift: +0.70 },
   maniac:     { rangeScale: 1.4,  foldShift: -0.35,  raiseShift: +0.25,  callShift: +0.10 },
   trapper:    { rangeScale: 0.9,  foldShift: +0.05,  raiseShift: -0.10,  callShift: +0.05 },
   bully:      { rangeScale: 1.1,  foldShift: -0.10,  raiseShift: +0.10,  callShift: 0 },
@@ -285,11 +285,6 @@ export function getPreflopActionCFR(
   // 1. Determine action sequence
   const actionSeq = getActionSequence(context.raisersAhead, context.facing3Bet);
 
-  // Skip CFR for "unopened" — the heuristic open-raise ranges are well-tuned
-  // and the solver's unopened data needs more iterations to converge.
-  // CFR tables shine for facing_raise/3bet/4bet where heuristics are weakest.
-  if (actionSeq === 'unopened') return null;
-
   // 2. Look up GTO strategy
   const gto = lookupGtoStrategy(cards, position, actionSeq);
   if (!gto) return null;
@@ -301,20 +296,27 @@ export function getPreflopActionCFR(
   const result = selectAction(styled);
   const label = canonicalizeLabel(cards);
 
-  // ── Sanity checks ─────────────────────────────────────────────────────
-  // These override solver noise for cases with clear poker-theoretic answers.
+  // ── Semantic fixes and sanity checks ────────────────────────────────
   const PREMIUMS = new Set(['AA', 'KK', 'QQ', 'AKs', 'AKo']);
 
-  // (a) Premium hands should never fold in any scenario.
-  if (PREMIUMS.has(label) && result.action === 'fold') {
-    return { action: gto.raise > gto.call ? 'raise' : 'call', frequency: 0.9 };
+  // BB unopened: CFR "call" = "check for free" (no cost to see flop).
+  // The caller (agents.ts) expects "fold" → converts to "check" when toCall=0.
+  // Return "fold" when GTO doesn't raise, matching the heuristic semantic.
+  if (position === 'BB' && actionSeq === 'unopened' && result.action === 'call') {
+    return { action: 'fold', frequency: 1 - styled.raise };
   }
 
-  // (b) Facing raises: if GTO says fold >85% in this scenario, the hand is
-  //     true garbage — override style deviation to fold. Threshold is 85%
-  //     (not lower) so loose styles can still call hands like 85o (fold ~77%)
-  //     and station can call K3o (fold ~64%), preserving style differentiation.
-  if (gto.fold > 0.85 && result.action !== 'fold') {
+  // (a) Premium hands: always raise (never fold or just call).
+  //     Station deviation can turn AA into "call" due to massive callShift,
+  //     but AA should raise from any position with any style.
+  if (PREMIUMS.has(label) && result.action !== 'raise') {
+    return { action: 'raise', frequency: 0.95 };
+  }
+
+  // (b) Facing raises: if GTO says fold >95% in this scenario, the hand is
+  //     absolute garbage — override style deviation to fold regardless of style.
+  //     Below 95%, let style deviations control (station needs to call marginal hands).
+  if (gto.fold > 0.96 && result.action !== 'fold') {
     return { action: 'fold', frequency: gto.fold };
   }
 

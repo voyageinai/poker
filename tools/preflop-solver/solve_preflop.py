@@ -341,7 +341,14 @@ class State:
         return s
 
     def payoffs(self, hands: List[int], eq_table: List[List[float]]) -> List[float]:
-        """Compute net payoffs for all 7 positions."""
+        """Compute net payoffs for all 7 positions.
+
+        Includes a raiser initiative bonus: the player who raised last
+        (the aggressor) gets a ~5% pot equity bonus representing the
+        postflop advantage from initiative, fold equity, and position.
+        Without this, the solver treats limping and raising as similar EV,
+        producing unrealistic strategies (e.g., AA limping 50% from UTG).
+        """
         pot = sum(self.invest)
         pays = [-self.invest[p] for p in range(NUM_POS)]
         live = [p for p in range(NUM_POS) if self.active[p]]
@@ -350,23 +357,51 @@ class State:
             return pays  # shouldn't happen
         elif len(live) == 1:
             pays[live[0]] = pot - self.invest[live[0]]
-        elif len(live) == 2:
-            a, b = live
-            e = eq_table[hands[a]][hands[b]]
-            pays[a] = e * pot - self.invest[a]
-            pays[b] = (1.0 - e) * pot - self.invest[b]
         else:
-            # Multiway: pairwise equity product approximation
-            raw = []
-            for p in live:
-                prod = 1.0
-                for q in live:
-                    if p != q:
-                        prod *= eq_table[hands[p]][hands[q]]
-                raw.append(prod)
-            total = sum(raw) or 1e-15
-            for k, p in enumerate(live):
-                pays[p] = (raw[k] / total) * pot - self.invest[p]
+            # Find the last raiser (aggressor) — gets initiative bonus
+            aggressor = -1
+            if self.rlevel > 0:
+                # The player who invested the most (and is still live) is likely the raiser
+                max_inv = -1
+                for p in live:
+                    if self.invest[p] > max_inv:
+                        max_inv = self.invest[p]
+                        aggressor = p
+
+            # Initiative bonus: aggressor gets ~3% pot equity edge postflop
+            # Scaled by raise level: open-raise gets full bonus, 3bet+ gets less
+            # (because 3bet pots are bigger and edge is relatively smaller)
+            INITIATIVE_BONUS = 0.03
+            rlevel_scale = 1.0 / max(1, self.rlevel)  # 0.06 for open, 0.03 for 3bet, etc.
+            bonus = INITIATIVE_BONUS * rlevel_scale
+
+            if len(live) == 2:
+                a, b = live
+                e = eq_table[hands[a]][hands[b]]
+                # Apply initiative bonus to aggressor
+                if aggressor == a:
+                    e = min(0.97, e + bonus)
+                elif aggressor == b:
+                    e = max(0.03, e - bonus)
+                pays[a] = e * pot - self.invest[a]
+                pays[b] = (1.0 - e) * pot - self.invest[b]
+            else:
+                # Multiway: pairwise equity product approximation with initiative
+                raw = []
+                for p in live:
+                    prod = 1.0
+                    for q in live:
+                        if p != q:
+                            e_pq = eq_table[hands[p]][hands[q]]
+                            if aggressor == p:
+                                e_pq = min(0.97, e_pq + bonus)
+                            elif aggressor == q:
+                                e_pq = max(0.03, e_pq - bonus)
+                            prod *= e_pq
+                    raw.append(prod)
+                total = sum(raw) or 1e-15
+                for k, p in enumerate(live):
+                    pays[p] = (raw[k] / total) * pot - self.invest[p]
 
         return pays
 

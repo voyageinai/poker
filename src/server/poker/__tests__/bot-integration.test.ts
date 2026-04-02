@@ -82,7 +82,7 @@ describe('Bot integration', () => {
 
       for (const agent of [nit, maniac]) {
         notifyNewHand(agent, 0, 1000, 2);
-        agent.notify({ type: 'hole_cards', cards: ['8h', '3d'] });
+        agent.notify({ type: 'hole_cards', cards: ['Jh', '9d'] });
       }
 
       const nitAction = await nit.requestAction({
