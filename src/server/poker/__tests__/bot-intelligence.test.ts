@@ -52,6 +52,20 @@ describe('Position awareness', () => {
     expect(calcPosition(1, 3, [1, 3, 5])).toBe('BB');
   });
 
+  it('handles 7-player table with distinct UTG, EP, and MP buckets', () => {
+    expect(calcPosition(6, 3, [0, 1, 2, 3, 4, 5, 6])).toBe('UTG');
+    expect(calcPosition(0, 3, [0, 1, 2, 3, 4, 5, 6])).toBe('EP');
+    expect(calcPosition(1, 3, [0, 1, 2, 3, 4, 5, 6])).toBe('MP');
+  });
+
+  it('handles 9-player table without collapsing three seats into UTG', () => {
+    expect(calcPosition(6, 3, [0, 1, 2, 3, 4, 5, 6, 7, 8])).toBe('UTG');
+    expect(calcPosition(7, 3, [0, 1, 2, 3, 4, 5, 6, 7, 8])).toBe('EP');
+    expect(calcPosition(8, 3, [0, 1, 2, 3, 4, 5, 6, 7, 8])).toBe('EP');
+    expect(calcPosition(0, 3, [0, 1, 2, 3, 4, 5, 6, 7, 8])).toBe('MP');
+    expect(calcPosition(1, 3, [0, 1, 2, 3, 4, 5, 6, 7, 8])).toBe('MP');
+  });
+
   it('handles 2-player table (heads-up: BTN=SB)', () => {
     expect(calcPosition(0, 0, [0, 3])).toBe('SB');
     expect(calcPosition(3, 0, [0, 3])).toBe('BB');
@@ -61,6 +75,7 @@ describe('Position awareness', () => {
     expect(getPositionFactor('BTN')).toBe(0.08);
     expect(getPositionFactor('CO')).toBe(0.06);
     expect(getPositionFactor('MP')).toBe(0);
+    expect(getPositionFactor('EP')).toBe(-0.03);
     expect(getPositionFactor('UTG')).toBe(-0.06);
     expect(getPositionFactor('SB')).toBe(-0.06);
     expect(getPositionFactor('BB')).toBe(-0.02);

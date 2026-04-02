@@ -34,7 +34,7 @@ const RANK_ORDER = '23456789TJQKA';
 /** Position RFI (Raise First In) thresholds — tighter from early, wider from late. */
 const POSITION_RFI: Record<Position, number> = {
   UTG: 0.58,
-  EP:  0.58,  // EP is equivalent to UTG (agents.ts uses 'EP' for early position)
+  EP:  0.55,
   MP:  0.52,
   CO:  0.40,
   BTN: 0.28,

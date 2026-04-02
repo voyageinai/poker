@@ -16,7 +16,7 @@ import { freshDeck } from './deck';
 import { getSystemBotByBinaryPath, type SystemBotDefinition, type SystemBotStyle } from '@/lib/system-bots';
 // ─── New strategy modules (v2 upgrade) ─────────────────────────────────────
 import { analyzeBoard, type BoardTexture } from './strategy/board-texture';
-import { preflopHandStrength as preflopHandStrengthV2, getPreflopAction } from './strategy/preflop-ranges';
+import { preflopHandStrength as preflopHandStrengthV2, getPreflopAction, type Position as PreflopPosition } from './strategy/preflop-ranges';
 import { adjustForStackDepth } from './strategy/stack-depth';
 import { postflopStrengthMC as postflopStrengthMCV2 } from './strategy/equity';
 import { chooseBalancedAction, type BalancedActionRequest } from './strategy/balanced-strategy';
@@ -433,7 +433,7 @@ export function computeExploit(opp: OpponentProfile): ExploitDeltas {
 
 // ─── Position awareness ──────────────────────────────────────────────────────
 
-export type Position = 'UTG' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
+export type Position = PreflopPosition;
 
 export function calcPosition(mySeat: number, buttonSeat: number, seatList: number[]): Position {
   const n = seatList.length;
@@ -458,12 +458,18 @@ export function calcPosition(mySeat: number, buttonSeat: number, seatList: numbe
   if (myIdx === 2) return 'BB';
   if (myIdx === n - 1) return 'CO';
 
-  // Remaining seats: split into EP and MP
+  // Remaining seats between BB and CO get progressively looser buckets as the
+  // table gets larger. This keeps 7-9 max from collapsing several distinct
+  // seats into the same ultra-tight UTG bucket.
   const middleCount = n - 4;
-  if (middleCount <= 0) return 'MP';
-  const epCount = Math.ceil(middleCount / 2);
+  if (middleCount <= 1) return 'UTG';
+  if (middleCount === 2) return myIdx === 3 ? 'UTG' : 'MP';
+
   const posInMiddle = myIdx - 3;
-  return posInMiddle < epCount ? 'UTG' : 'MP';
+  if (posInMiddle === 0) return 'UTG';
+
+  const epCount = Math.floor((middleCount - 1) / 2);
+  return posInMiddle <= epCount ? 'EP' : 'MP';
 }
 
 export function getPositionFactor(position: Position): number {
@@ -471,6 +477,7 @@ export function getPositionFactor(position: Position): number {
     case 'BTN': return 0.08;
     case 'CO':  return 0.06;
     case 'MP':  return 0;
+    case 'EP':  return -0.03;
     case 'UTG': return -0.06;
     case 'SB':  return -0.06;
     case 'BB':  return -0.02;
@@ -918,7 +925,7 @@ export class BuiltinBotAgent implements PlayerAgent {
       if (req.street !== 'preflop') {
         const bluffResult = checkUnconditionalBluff(
           personalityStyle,
-          this.myPosition as 'UTG' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB',
+          this.myPosition,
           req.street,
           pbCtx.boardTexture,
           req.toCall > 0,

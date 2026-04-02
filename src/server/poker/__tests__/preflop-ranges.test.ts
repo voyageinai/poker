@@ -247,7 +247,7 @@ describe('preflopHandStrength', () => {
   });
 
   it('result always between 0 and 1', () => {
-    const positions: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
+    const positions: Position[] = ['UTG', 'EP', 'MP', 'CO', 'BTN', 'SB', 'BB'];
     const styles: SystemBotStyle[] = ['nit', 'tag', 'lag', 'gto', 'maniac'];
     const hands: [string, string][] = [
       ['Ah', 'As'],
@@ -300,6 +300,22 @@ describe('preflopHandStrength', () => {
       if (nitResult.action !== 'fold') nitPlays++;
     }
     expect(maniacPlays).toBeGreaterThan(nitPlays);
+  });
+
+  it('tag opens KJo more readily from EP than from UTG', () => {
+    const utg = getPreflopAction(['Kh', 'Jd'], 'UTG', 'tag', {
+      facing3Bet: false,
+      raisersAhead: 0,
+      stackBB: 100,
+    });
+    const ep = getPreflopAction(['Kh', 'Jd'], 'EP', 'tag', {
+      facing3Bet: false,
+      raisersAhead: 0,
+      stackBB: 100,
+    });
+
+    expect(utg.action).toBe('call');
+    expect(ep.action).toBe('raise');
   });
 
   it('trapper can flat medium premiums facing a single raise', () => {

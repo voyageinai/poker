@@ -13,7 +13,7 @@ import type { BoardTexture } from './board-texture';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type Street = 'preflop' | 'flop' | 'turn' | 'river';
-export type Position = 'UTG' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
+export type Position = 'UTG' | 'EP' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
 
 export type SizingSpec =
   | { mode: 'pot_fraction'; fraction: number }

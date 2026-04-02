@@ -12,7 +12,7 @@ import type { BoardTexture } from './board-texture';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type Position = 'UTG' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
+type Position = 'UTG' | 'EP' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
 type Street = 'preflop' | 'flop' | 'turn' | 'river';
 
 interface BluffConfig {
@@ -28,7 +28,7 @@ interface BluffConfig {
 
 const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
   maniac: {
-    positionRate: { UTG: 0.12, MP: 0.15, CO: 0.20, BTN: 0.25, SB: 0.18, BB: 0.10 },
+    positionRate: { UTG: 0.12, EP: 0.13, MP: 0.15, CO: 0.20, BTN: 0.25, SB: 0.18, BB: 0.10 },
     dryBoardBonus: 0.10,
     wetBoardPenalty: 0.08,
     secondBarrelRate: 0.65,
@@ -36,7 +36,7 @@ const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
     sizingFraction: 0.80,
   },
   lag: {
-    positionRate: { UTG: 0.05, MP: 0.08, CO: 0.12, BTN: 0.18, SB: 0.10, BB: 0.05 },
+    positionRate: { UTG: 0.05, EP: 0.06, MP: 0.08, CO: 0.12, BTN: 0.18, SB: 0.10, BB: 0.05 },
     dryBoardBonus: 0.08,
     wetBoardPenalty: 0.06,
     secondBarrelRate: 0.45,
@@ -44,7 +44,7 @@ const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
     sizingFraction: 0.67,
   },
   bully: {
-    positionRate: { UTG: 0.08, MP: 0.10, CO: 0.15, BTN: 0.20, SB: 0.12, BB: 0.06 },
+    positionRate: { UTG: 0.08, EP: 0.09, MP: 0.10, CO: 0.15, BTN: 0.20, SB: 0.12, BB: 0.06 },
     dryBoardBonus: 0.05,
     wetBoardPenalty: 0.05,
     secondBarrelRate: 0.50,
@@ -52,7 +52,7 @@ const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
     sizingFraction: 1.00,
   },
   tag: {
-    positionRate: { UTG: 0, MP: 0.03, CO: 0.08, BTN: 0.12, SB: 0.05, BB: 0 },
+    positionRate: { UTG: 0, EP: 0.01, MP: 0.03, CO: 0.08, BTN: 0.12, SB: 0.05, BB: 0 },
     dryBoardBonus: 0.05,
     wetBoardPenalty: 0.04,
     secondBarrelRate: 0.32,
@@ -60,7 +60,7 @@ const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
     sizingFraction: 0.58,
   },
   nit: {
-    positionRate: { UTG: 0, MP: 0, CO: 0, BTN: 0.02, SB: 0, BB: 0 },
+    positionRate: { UTG: 0, EP: 0, MP: 0, CO: 0, BTN: 0.02, SB: 0, BB: 0 },
     dryBoardBonus: 0,
     wetBoardPenalty: 0,
     secondBarrelRate: 0.05,
@@ -68,7 +68,7 @@ const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
     sizingFraction: 0.33,
   },
   trapper: {
-    positionRate: { UTG: 0, MP: 0.02, CO: 0.03, BTN: 0.05, SB: 0.02, BB: 0 },
+    positionRate: { UTG: 0, EP: 0.01, MP: 0.02, CO: 0.03, BTN: 0.05, SB: 0.02, BB: 0 },
     dryBoardBonus: 0.05,
     wetBoardPenalty: 0.03,
     secondBarrelRate: 0.15,
@@ -76,7 +76,7 @@ const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
     sizingFraction: 0.50,
   },
   gto: {
-    positionRate: { UTG: 0, MP: 0.01, CO: 0.04, BTN: 0.06, SB: 0.02, BB: 0 },
+    positionRate: { UTG: 0, EP: 0.005, MP: 0.01, CO: 0.04, BTN: 0.06, SB: 0.02, BB: 0 },
     dryBoardBonus: 0.02,
     wetBoardPenalty: 0.03,
     secondBarrelRate: 0.28,
