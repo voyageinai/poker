@@ -5,7 +5,7 @@
  * and bot style. Provides hand strength scoring and action recommendations.
  */
 
-export type Position = 'UTG' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
+export type Position = 'UTG' | 'EP' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
 
 export type SystemBotStyle =
   | 'nit' | 'tag' | 'lag' | 'station' | 'maniac'
@@ -25,6 +25,7 @@ const RANK_ORDER = '23456789TJQKA';
 /** Position RFI (Raise First In) thresholds — tighter from early, wider from late. */
 const POSITION_RFI: Record<Position, number> = {
   UTG: 0.58,
+  EP:  0.58,  // EP is equivalent to UTG (agents.ts uses 'EP' for early position)
   MP:  0.52,
   CO:  0.40,
   BTN: 0.28,
@@ -201,7 +202,13 @@ export function getPreflopAction(
   cards: [string, string],
   position: Position,
   style: SystemBotStyle,
-  context: { facing3Bet: boolean; raisersAhead: number; stackBB: number },
+  context: {
+    facing3Bet: boolean;
+    raisersAhead: number;
+    stackBB: number;
+    toCallBB?: number;     // how many BB to call (enables commitment-based tightening)
+    potOdds?: number;      // toCall / (pot + toCall), for call profitability
+  },
 ): { action: 'fold' | 'call' | 'raise'; frequency: number } {
   const hand = canonicalize(cards);
   const mod = STYLE_MODIFIERS[style];
@@ -222,14 +229,26 @@ export function getPreflopAction(
     strength -= 0.12;
   }
 
+  // Gradual commitment penalty: the more BB you need to call, the tighter you should be
+  // This prevents station from calling 5-bets with 42o
+  // Coefficient varies by style: station has smallest penalty, nit has largest
+  const commitPenaltyCoeff: Record<SystemBotStyle, number> = {
+    nit: 0.08, tag: 0.06, lag: 0.04, station: 0.025, maniac: 0.02,
+    trapper: 0.05, bully: 0.04, tilter: 0.04, shortstack: 0.06, adaptive: 0.05, gto: 0.05,
+  };
+  if (context.toCallBB && context.toCallBB > 2) {
+    // Penalty scales with how many BB you need to call beyond a standard open (2BB)
+    const excessBB = context.toCallBB - 2;
+    strength -= excessBB * commitPenaltyCoeff[style];
+  }
+
   // Station style prefers calling over raising against aggression
   const isCallStation = style === 'station';
 
   // Compute threshold: base RFI adjusted by style
   const rfiThreshold = POSITION_RFI[position] - mod.rfiShift;
 
-  // Call zone width varies by style: loose/passive styles have wider call zones,
-  // tight styles have narrower ones (they prefer to raise or fold, less flatting).
+  // Call zone width varies by style
   const callZoneWidth: Record<SystemBotStyle, number> = {
     nit:        0.04,
     tag:        0.08,
@@ -247,7 +266,6 @@ export function getPreflopAction(
 
   // Decision
   if (strength >= rfiThreshold) {
-    // Station prefers calling when facing raisers
     if (isCallStation && context.raisersAhead > 0) {
       return { action: 'call', frequency: 0.85 };
     }

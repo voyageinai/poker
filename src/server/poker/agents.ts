@@ -14,7 +14,7 @@ import { freshDeck } from './deck';
 import { getSystemBotByBinaryPath, type SystemBotDefinition, type SystemBotStyle } from '@/lib/system-bots';
 // ─── New strategy modules (v2 upgrade) ─────────────────────────────────────
 import { analyzeBoard, type BoardTexture } from './strategy/board-texture';
-import { preflopHandStrength as preflopHandStrengthV2 } from './strategy/preflop-ranges';
+import { preflopHandStrength as preflopHandStrengthV2, getPreflopAction } from './strategy/preflop-ranges';
 import { adjustForStackDepth } from './strategy/stack-depth';
 import { postflopStrengthMC as postflopStrengthMCV2 } from './strategy/equity';
 import { chooseBalancedAction, type BalancedActionRequest } from './strategy/balanced-strategy';
@@ -664,6 +664,7 @@ export class BuiltinBotAgent implements PlayerAgent {
     // ─── Universal opponent modeling (v2: per-player, scaled by exploitWeight) ─
     // Try per-player exploit first (v2), fall back to legacy average
     let exploitApplied = false;
+    let callThresholdDelta = 0;  // v2: exploit-driven call threshold adjustment
     if (req.history.length > 0) {
       const lastActor = req.history[req.history.length - 1];
       const targetPid = this.seatToPlayerId.get(lastActor.seat);
@@ -674,6 +675,7 @@ export class BuiltinBotAgent implements PlayerAgent {
           cfg.bluffRate = clamp01(cfg.bluffRate + exploit.bluffDelta * cfg.exploitWeight);
           cfg.slowplayRate = clamp01(cfg.slowplayRate + exploit.slowplayDelta * cfg.exploitWeight);
           cfg.checkRaiseRate = clamp01(cfg.checkRaiseRate + exploit.checkRaiseDelta * cfg.exploitWeight);
+          callThresholdDelta = exploit.callThresholdDelta * cfg.exploitWeight;
           const profile = this.opponentTracker.getProfile(targetPid);
           if (profile && !extraReasoning) {
             extraReasoning = ` 对手${targetPid}(VPIP ${Math.round(profile.vpipRate * 100)}% AF ${profile.af.toFixed(1)}).`;
@@ -691,6 +693,7 @@ export class BuiltinBotAgent implements PlayerAgent {
         cfg.bluffRate = clamp01(cfg.bluffRate + exploit.bluffDelta * cfg.exploitWeight);
         cfg.slowplayRate = clamp01(cfg.slowplayRate + exploit.slowplayDelta * cfg.exploitWeight);
         cfg.checkRaiseRate = clamp01(cfg.checkRaiseRate + exploit.checkRaiseDelta * cfg.exploitWeight);
+        callThresholdDelta = exploit.callThresholdDelta * cfg.exploitWeight;
         if (!extraReasoning) {
           extraReasoning = ` 对手画像(VPIP ${Math.round(oppProfile.vpipRate * 100)}% AF ${oppProfile.af.toFixed(1)}).`;
         }
@@ -730,26 +733,92 @@ export class BuiltinBotAgent implements PlayerAgent {
       });
     }
 
-    // ─── Standard path (all other styles use the generic engine) ─────────
+    // ─── v2 Preflop: use getPreflopAction for position-aware decisions ────
     const opponents = Math.max(1, this.players.length - 1);
-    // v2: position-aware preflop strength + consolidated MC equity
-    const rawStrength = req.street === 'preflop'
-      ? preflopHandStrengthV2(this.holeCards, this.myPosition, style)
-      : postflopStrengthMCV2(this.holeCards, req.board, opponents);
-    // v2: stack-depth adjustment (deep stacks favor speculative hands)
     const bbCount = req.stack / Math.max(this.bigBlind, 1);
-    const strength = adjustForStackDepth(this.holeCards, rawStrength, bbCount);
-    // v2: board texture analysis (postflop only)
-    const texture: BoardTexture | null = req.street !== 'preflop' ? analyzeBoard(req.board) : null;
+
+    if (req.street === 'preflop') {
+      // Human pressure: boost raise frequency preflop vs humans
+      let humanPressureBoost = 0;
+      for (const [seat, meta] of this.playerMeta) {
+        if (seat === this.mySeat || meta.isBot) continue;
+        const oppStats = this.opponentStats.get(seat);
+        let statsForAssess: { hands: number; vpipRate: number; af: number } | undefined;
+        if (oppStats && oppStats.hands >= 3) {
+          statsForAssess = {
+            hands: oppStats.hands,
+            vpipRate: oppStats.vpip / oppStats.hands,
+            af: oppStats.passActions > 0 ? oppStats.aggActions / oppStats.passActions : 1,
+          };
+        }
+        const skill = assessHumanSkill(meta.elo, statsForAssess);
+        humanPressureBoost = calcHumanPressure(skill, this.definition.style);
+        break;
+      }
+
+      const raisersAhead = req.history.filter(h => h.action === 'raise' || h.action === 'allin').length;
+      const toCallBB = req.toCall / Math.max(this.bigBlind, 1);
+      const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
+      const preflopDecision = getPreflopAction(this.holeCards, this.myPosition, style, {
+        facing3Bet: raisersAhead >= 2,
+        raisersAhead,
+        stackBB: bbCount,
+        toCallBB,
+        potOdds,
+      });
+
+      // Apply frequency-based randomization (boosted by human pressure)
+      const roll = Math.random();
+      const boostedFreq = Math.min(1, preflopDecision.frequency + humanPressureBoost);
+      let preflopAction: PokerAction;
+      if (preflopDecision.action === 'raise') {
+        if (roll < boostedFreq) {
+          // Use chooseRaiseAction for sizing
+          const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
+          preflopAction = chooseRaiseAction(req, raiseStrength, cfg, style);
+        } else {
+          preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
+        }
+      } else if (preflopDecision.action === 'call') {
+        // Human pressure can upgrade some calls to raises
+        if (humanPressureBoost > 0 && roll < humanPressureBoost * 0.5) {
+          const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
+          preflopAction = chooseRaiseAction(req, raiseStrength, cfg, style);
+        } else if (roll < boostedFreq) {
+          preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
+        } else {
+          preflopAction = req.toCall > 0 ? { action: 'fold' } : { action: 'check' };
+        }
+      } else {
+        preflopAction = req.toCall > 0 ? { action: 'fold' } : { action: 'check' };
+      }
+
+      const preflopStrengthVal = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
+      return Promise.resolve({
+        ...preflopAction,
+        debug: {
+          equity: preflopStrengthVal,
+          potOdds,
+          reasoning: `${this.definition.name}: preflop ${this.myPosition} ${preflopDecision.action}(${Math.round(preflopDecision.frequency * 100)}%). ${describeHolding(req.street, this.holeCards, req.board)}.${extraReasoning}`,
+        },
+      });
+    }
+
+    // ─── Postflop path (standard engine) ─────────────────────────────────
+    // v2: MC equity (no looseness inflation, no stack-depth on postflop)
+    const strength = postflopStrengthMCV2(this.holeCards, req.board, opponents);
+    // v2: board texture analysis
+    const texture: BoardTexture | null = analyzeBoard(req.board);
     const crowdPenalty = Math.max(0, opponents - 2) * 0.04 * cfg.crowdSensitivity;
     const posFactor = getPositionFactor(this.myPosition) * cfg.positionSensitivity;
     const isLatePosition = this.myPosition === 'BTN' || this.myPosition === 'CO';
     cfg.bluffRate = clamp01(cfg.bluffRate + (isLatePosition ? 0.03 : -0.02) * cfg.positionSensitivity);
-    let adjustedStrength = clamp01(strength - crowdPenalty + cfg.looseness * 0.25 + posFactor);
-    // v2: texture-aware bluff adjustment (wet boards = less bluffing, dry = more)
+    // v2 fix: NO looseness*0.25 inflation — looseness only affects callThreshold
+    let adjustedStrength = clamp01(strength - crowdPenalty + posFactor);
+    // v2: texture-aware bluff adjustment
     if (texture) {
-      if (texture.wetness < 0.25) cfg.bluffRate = clamp01(cfg.bluffRate + 0.03); // bluff more on dry
-      if (texture.wetness > 0.55) cfg.bluffRate = clamp01(cfg.bluffRate - 0.03); // bluff less on wet
+      if (texture.wetness < 0.25) cfg.bluffRate = clamp01(cfg.bluffRate + 0.03);
+      if (texture.wetness > 0.55) cfg.bluffRate = clamp01(cfg.bluffRate - 0.03);
     }
 
     // Multi-street pattern adjustment (lower effective strength when danger patterns detected)
@@ -786,7 +855,7 @@ export class BuiltinBotAgent implements PlayerAgent {
     }
 
     const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
-    const action = chooseBuiltinAction(style, adjustedStrength, potOdds, req, cfg, texture);
+    const action = chooseBuiltinAction(style, adjustedStrength, potOdds, req, cfg, texture, callThresholdDelta);
 
     return Promise.resolve({
       ...action,
@@ -912,6 +981,7 @@ function chooseBuiltinAction(
   req: ActionRequest,
   cfg?: StyleParams,
   texture?: BoardTexture | null,
+  callThresholdDelta: number = 0,
 ): PokerAction {
   if (!cfg) cfg = STYLE_CONFIG[style];
 
@@ -947,7 +1017,8 @@ function chooseBuiltinAction(
   // Station (0.72): base ~0.20, potOdds discounted 36% → calls almost anything
   const baseThreshold = 0.40 - cfg.looseness * 0.28 + callPressure * 0.12 - commitmentDiscount;
   const oddsThreshold = potOdds * (1 - cfg.looseness * 0.5);
-  const callThreshold = Math.max(baseThreshold, oddsThreshold);
+  // v2: apply exploit callThresholdDelta (negative = easier to call, positive = tighter)
+  const callThreshold = Math.max(baseThreshold, oddsThreshold) + callThresholdDelta;
 
   // Raise threshold: aggressive styles raise thinner
   // Nit: 0.65  TAG: 0.55  LAG: 0.44  Station: 0.66
