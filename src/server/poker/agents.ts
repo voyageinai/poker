@@ -809,7 +809,7 @@ export class BuiltinBotAgent implements PlayerAgent {
     const strength = postflopStrengthMCV2(this.holeCards, req.board, opponents);
     // v2: board texture analysis
     const texture: BoardTexture | null = analyzeBoard(req.board);
-    const crowdPenalty = Math.max(0, opponents - 2) * 0.04 * cfg.crowdSensitivity;
+    const crowdPenalty = Math.max(0, opponents - 2) * 0.03 * cfg.crowdSensitivity;
     const posFactor = getPositionFactor(this.myPosition) * cfg.positionSensitivity;
     const isLatePosition = this.myPosition === 'BTN' || this.myPosition === 'CO';
     cfg.bluffRate = clamp01(cfg.bluffRate + (isLatePosition ? 0.03 : -0.02) * cfg.positionSensitivity);
@@ -837,6 +837,8 @@ export class BuiltinBotAgent implements PlayerAgent {
         if (patterns.betBetBet) patternPenalty += 0.06;
         if (patterns.checkCheckBet) patternPenalty += 0.08;
         if (patterns.timesRaised >= 2) patternPenalty += 0.10;
+        // Cap total pattern penalty to prevent over-folding on multi-action boards
+        patternPenalty = Math.min(patternPenalty, 0.15);
         adjustedStrength = clamp01(adjustedStrength - patternPenalty * cfg.patternSensitivity);
       }
     }
@@ -1048,13 +1050,17 @@ function chooseBuiltinAction(
 
   const callPressure = req.toCall / Math.max(req.stack + req.toCall, 1);
 
-  // Call threshold: potOdds sets a floor, but looseness actively lowers it.
-  // Nit (0.18): base ~0.36, potOdds barely discounted → tight
-  // Station (0.72): base ~0.20, potOdds discounted 36% → calls almost anything
-  const baseThreshold = 0.40 - cfg.looseness * 0.28 + callPressure * 0.12 - commitmentDiscount;
+  // Call threshold: weighted blend of style floor and pot-odds threshold.
+  // Old Math.max(base, odds) was too tight — pot odds couldn't lower the threshold.
+  // Now loose styles weight pot odds more (call when price is right),
+  // tight styles weight base threshold more (need hand strength regardless of price).
+  // Nit: base ~0.29, oddsW 0.42   TAG: base ~0.21, oddsW 0.52
+  // Station: base ~0.12, oddsW 0.64   Maniac: base ~0.09, oddsW 0.68
+  const baseThreshold = 0.34 - cfg.looseness * 0.30 + callPressure * 0.10 - commitmentDiscount;
   const oddsThreshold = potOdds * (1 - cfg.looseness * 0.5);
+  const oddsWeight = 0.35 + cfg.looseness * 0.40;
   // v2: apply exploit callThresholdDelta (negative = easier to call, positive = tighter)
-  const callThreshold = Math.max(baseThreshold, oddsThreshold) + callThresholdDelta;
+  const callThreshold = baseThreshold * (1 - oddsWeight) + oddsThreshold * oddsWeight + callThresholdDelta;
 
   // Raise threshold: aggressive styles raise thinner
   // Nit: 0.65  TAG: 0.55  LAG: 0.44  Station: 0.66
@@ -1063,7 +1069,9 @@ function chooseBuiltinAction(
   // Bet sizing adjustment
   const betSizeRatio = req.toCall / Math.max(req.pot, 1);
   const sizingMult = getBetSizingMultiplier(betSizeRatio);
-  const sizedCallThreshold = callThreshold * lerp(1.0, sizingMult, cfg.sizingSensitivity);
+  // Pot-odds-anchored call threshold already encodes bet sizing; only apply mild
+  // sensitivity so extreme overbets still feel slightly scarier for cautious styles.
+  const sizedCallThreshold = callThreshold * lerp(1.0, sizingMult, cfg.sizingSensitivity * 0.25);
   const sizedRaiseThreshold = raiseThreshold * lerp(1.0, sizingMult, cfg.sizingSensitivity);
 
   // Raise cap sentinel: MAX_SAFE_INTEGER signals "no more raises allowed"
