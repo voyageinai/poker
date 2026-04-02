@@ -1,3 +1,5 @@
+
+
 /**
  * PlayerAgent abstraction — table state machine only calls these methods,
  * never directly touches WebSocket or subprocess.
@@ -826,28 +828,52 @@ export class BuiltinBotAgent implements PlayerAgent {
 
       // Apply frequency-based randomization (boosted by human pressure)
       const roll = Math.random();
-      const boostedFreq = Math.min(1, preflopDecision.frequency + humanPressureBoost);
       let preflopAction: PokerAction;
-      if (preflopDecision.action === 'raise') {
-        if (roll < boostedFreq) {
-          // Use chooseRaiseAction for sizing
-          const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
-          preflopAction = chooseRaiseAction(req, raiseStrength, cfg, style);
-        } else {
-          preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
+
+      // When full CFR mixed-strategy frequencies are available, use proper
+      // 3-way randomization instead of the binary dominant-action approach.
+      // This prevents the old bug where call-dominant hands (e.g. station TT:
+      // 53% call, 47% raise, 0% fold) had the raise portion incorrectly
+      // converted to fold.
+      if (preflopDecision.frequencies) {
+        let { fold: pFold, call: pCall, raise: pRaise } = preflopDecision.frequencies;
+        // Boost raise frequency with human pressure, but ONLY on hands that
+        // are already in the play range. Boosting garbage hands (fold>85%)
+        // causes absurd plays like TAG raising J5o from MP.
+        if (humanPressureBoost > 0 && pFold < 0.85) {
+          pRaise = Math.min(1, pRaise + humanPressureBoost);
+          pFold = Math.max(0, pFold - humanPressureBoost * 0.5);
+          pCall = Math.max(0, pCall - humanPressureBoost * 0.5);
+          const total = pFold + pCall + pRaise;
+          if (total > 0) { pFold /= total; pCall /= total; pRaise /= total; }
         }
-      } else if (preflopDecision.action === 'call') {
-        // Human pressure can upgrade some calls to raises
-        if (humanPressureBoost > 0 && roll < humanPressureBoost * 0.5) {
+        if (roll < pFold) {
+          preflopAction = req.toCall > 0 ? { action: 'fold' } : { action: 'check' };
+        } else if (roll < pFold + pCall) {
+          preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
+        } else {
           const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
           preflopAction = chooseRaiseAction(req, raiseStrength, cfg, style);
-        } else if (roll < boostedFreq) {
-          preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
+        }
+      } else {
+        // Heuristic fallback: binary randomization on dominant action
+        const boostedFreq = Math.min(1, preflopDecision.frequency + humanPressureBoost);
+        if (preflopDecision.action === 'raise') {
+          if (roll < boostedFreq) {
+            const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
+            preflopAction = chooseRaiseAction(req, raiseStrength, cfg, style);
+          } else {
+            preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
+          }
+        } else if (preflopDecision.action === 'call') {
+          if (roll < boostedFreq) {
+            preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
+          } else {
+            preflopAction = req.toCall > 0 ? { action: 'fold' } : { action: 'check' };
+          }
         } else {
           preflopAction = req.toCall > 0 ? { action: 'fold' } : { action: 'check' };
         }
-      } else {
-        preflopAction = req.toCall > 0 ? { action: 'fold' } : { action: 'check' };
       }
 
       const preflopStrengthVal = preflopHandStrengthV2(this.holeCards, this.myPosition, style);

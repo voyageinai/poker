@@ -47,6 +47,8 @@ export class TableManager {
   private _nextHandTimer: ReturnType<typeof setTimeout> | null = null;
   /** Action history for the current street, passed to bots for context */
   private streetHistory: Array<{ seat: number; action: ActionType; amount: number }> = [];
+  /** True during blind-posting phase; prevents blind posts from polluting streetHistory */
+  private blindsPhase = false;
   /** Per-seat starting stack for the current hand (before any bets including blinds) */
   private initialStacks = new Map<number, number>();
 
@@ -272,6 +274,7 @@ export class TableManager {
     this.handId = nanoid();
     this.currentStreet = 'preflop';
     this.streetHistory = [];
+    this.blindsPhase = true;
 
     let events: TableEvent[];
     try {
@@ -389,6 +392,7 @@ export class TableManager {
       }
 
       case 'action_request': {
+        this.blindsPhase = false;  // First action_request marks end of blind-posting phase
         const seat = event.seat;
         const info = this.agents.get(seat);
         const player = this.state.players[seat];
@@ -416,7 +420,8 @@ export class TableManager {
           }
 
           resultAction = { action: response.action, amount: response.amount };
-        } catch {
+        } catch (err) {
+          console.error(`[Table ${this.tableId}] Bot exception at seat ${seat}, auto-folding:`, err);
           resultAction = { action: 'fold' };
         }
 
@@ -447,7 +452,11 @@ export class TableManager {
       }
 
       case 'player_action': {
-        this.streetHistory.push({ seat: event.seat, action: event.action as ActionType, amount: event.amount });
+        // Skip blind posts — they are emitted as 'raise' but must not pollute
+        // the action history that bots use to count raisersAhead.
+        if (!this.blindsPhase) {
+          this.streetHistory.push({ seat: event.seat, action: event.action as ActionType, amount: event.amount });
+        }
         wsHub.broadcast(this.tableId, {
           type: 'player_action',
           seat: event.seat,

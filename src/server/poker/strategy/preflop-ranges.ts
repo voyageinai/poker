@@ -213,7 +213,7 @@ export function getPreflopAction(
     toCallBB?: number;     // how many BB to call (enables commitment-based tightening)
     potOdds?: number;      // toCall / (pot + toCall), for call profitability
   },
-): { action: 'fold' | 'call' | 'raise'; frequency: number } {
+): { action: 'fold' | 'call' | 'raise'; frequency: number; frequencies?: { fold: number; call: number; raise: number } } {
   // Try CFR-solved tables first (returns null if unavailable or hand not found)
   const cfrResult = getPreflopActionCFR(cards, position, style, context);
   if (cfrResult) return cfrResult;

@@ -25,7 +25,11 @@ const QUICK_BETS = [
 ];
 
 export default function ActionControls({ toCall, minRaise, stack, currentBet, pot, onAction, timeoutMs, compact }: Props) {
-  const [raiseAmount, setRaiseAmount] = useState(currentBet + minRaise);
+  // Cap minRaise: MAX_SAFE_INTEGER is a sentinel meaning "raise cap reached"
+  const raiseCapped = minRaise > stack * 2;
+  const effectiveMinRaise = raiseCapped ? stack : minRaise;
+
+  const [raiseAmount, setRaiseAmount] = useState(currentBet + effectiveMinRaise);
 
   const [remaining, setRemaining] = useState(timeoutMs);
   const startTime = useRef(Date.now());
@@ -44,13 +48,13 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
   const urgent = remaining < 5000;
   const canCheck = toCall === 0;
   const canCall = toCall > 0 && toCall <= stack;
-  const canRaise = stack > toCall && raiseAmount <= stack + (currentBet - toCall);
+  const canRaise = !raiseCapped && stack > toCall && raiseAmount <= stack + (currentBet - toCall);
   const callAmount = Math.min(toCall, stack);
   const isAllIn = stack <= toCall;
 
-  const minRaiseTotal = currentBet + minRaise;
+  const minRaiseTotal = currentBet + effectiveMinRaise;
   const maxRaiseTotal = currentBet + stack - toCall;
-  const canShowSlider = stack > toCall;
+  const canShowSlider = !raiseCapped && stack > toCall;
 
   // ─── Mobile compact layout: stacked vertically ──────────────────────────────
   if (compact) {

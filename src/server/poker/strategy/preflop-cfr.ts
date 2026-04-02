@@ -257,14 +257,14 @@ function applyStyleDeviation(
  */
 function selectAction(
   freqs: ActionFrequencies,
-): { action: 'fold' | 'call' | 'raise'; frequency: number } {
+): { action: 'fold' | 'call' | 'raise'; frequency: number; frequencies: ActionFrequencies } {
   if (freqs.raise >= freqs.call && freqs.raise >= freqs.fold) {
-    return { action: 'raise', frequency: freqs.raise };
+    return { action: 'raise', frequency: freqs.raise, frequencies: freqs };
   }
   if (freqs.call >= freqs.fold) {
-    return { action: 'call', frequency: freqs.call };
+    return { action: 'call', frequency: freqs.call, frequencies: freqs };
   }
-  return { action: 'fold', frequency: freqs.fold };
+  return { action: 'fold', frequency: freqs.fold, frequencies: freqs };
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -287,7 +287,7 @@ export function getPreflopActionCFR(
     toCallBB?: number;
     potOdds?: number;
   },
-): { action: 'fold' | 'call' | 'raise'; frequency: number } | null {
+): { action: 'fold' | 'call' | 'raise'; frequency: number; frequencies?: { fold: number; call: number; raise: number } } | null {
   if (!cfrTables) return null;
 
   // Quality gate: only use CFR tables when the solver has run enough iterations
