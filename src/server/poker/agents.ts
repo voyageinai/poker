@@ -705,10 +705,8 @@ export class BuiltinBotAgent implements PlayerAgent {
     // doesn't apply preflop and inflates VPIP to ~70%.
     if (style === 'gto' && req.street !== 'preflop') {
       const opponents = Math.max(1, this.players.length - 1);
-      const gtoStrength = req.street === 'preflop'
-        ? preflopHandStrengthV2(this.holeCards, this.myPosition, style)
-        : postflopStrengthMCV2(this.holeCards, req.board, opponents);
-      const texture = req.street !== 'preflop' ? analyzeBoard(req.board) : null;
+      const gtoStrength = postflopStrengthMCV2(this.holeCards, req.board, opponents);
+      const texture = analyzeBoard(req.board);
       const balancedReq: BalancedActionRequest = {
         street: req.street,
         board: req.board,

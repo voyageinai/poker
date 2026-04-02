@@ -91,7 +91,7 @@ export async function runMatch(
     // startHand advances button internally, and handIdx naturally rotates
     // But since we create fresh state each time, we need to set button manually
     if (handIdx > 0) {
-      (state as Record<string, unknown>).buttonSeat = (handIdx - 1) % numSeats;
+      (state as unknown as Record<string, unknown>).buttonSeat = (handIdx - 1) % numSeats;
     }
 
     // Start hand
