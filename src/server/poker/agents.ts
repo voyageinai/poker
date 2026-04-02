@@ -20,6 +20,7 @@ import { postflopStrengthMC as postflopStrengthMCV2 } from './strategy/equity';
 import { chooseBalancedAction, type BalancedActionRequest } from './strategy/balanced-strategy';
 import { OpponentTracker } from './strategy/opponent-model';
 import { chooseBetSize, type LegalConstraints } from './strategy/bet-sizing';
+import { solverDecision } from './solver/solver-integration';
 
 const BOT_ACTION_TIMEOUT_MS = parseInt(process.env.BOT_ACTION_TIMEOUT_MS ?? '5000', 10);
 const HUMAN_ACTION_TIMEOUT_MS = parseInt(process.env.HUMAN_ACTION_TIMEOUT_MS ?? '30000', 10);
@@ -697,6 +698,31 @@ export class BuiltinBotAgent implements PlayerAgent {
         if (!extraReasoning) {
           extraReasoning = ` 对手画像(VPIP ${Math.round(oppProfile.vpipRate * 100)}% AF ${oppProfile.af.toFixed(1)}).`;
         }
+      }
+    }
+
+    // ─── Solver path: DCFR / Blueprint for postflop decisions ─────────
+    // Try solver-based decision first (DCFR for heads-up, blueprint+search if loaded).
+    // Returns null for multi-way pots or if solver is unavailable → falls through.
+    if (req.street !== 'preflop') {
+      const numOpponents = Math.max(1, this.players.length - 1);
+      const solverResult = solverDecision(
+        this.holeCards, req.board, req.pot, req.stack,
+        req.toCall, req.minRaise, req.currentBet,
+        req.street as 'flop' | 'turn' | 'river', style, numOpponents,
+      );
+      if (solverResult) {
+        const action: PokerAction = solverResult.amount > 0
+          ? { action: solverResult.action as 'raise', amount: solverResult.amount }
+          : { action: solverResult.action as 'fold' | 'check' | 'call' | 'allin' };
+        return Promise.resolve({
+          ...action,
+          debug: {
+            equity: solverResult.debug?.strength ?? 0,
+            potOdds: req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0,
+            reasoning: `${this.definition.name}: DCFR solver [${solverResult.debug?.source}] ${solverResult.debug?.iterations ?? 0} iterations. ${describeHolding(req.street, this.holeCards, req.board)}.`,
+          },
+        });
       }
     }
 
