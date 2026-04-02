@@ -4,7 +4,7 @@
  * Single source of truth for Monte Carlo equity with draw bonus smoothing.
  * Replaces the inline postflopStrengthMC in agents.ts.
  */
-import { monteCarloEquity } from '@/server/poker/hand-eval'
+import { fastMonteCarloEquity as monteCarloEquity } from '@/server/poker/fast-eval'
 import type { Card } from '@/lib/types'
 
 // ─── Draw detection ────────────────────────────────────────────────────────────
