@@ -62,14 +62,13 @@ export async function POST(
     const pool = table.level ? LEVEL_BOT_POOL[table.level as StakeLevelId] ?? [] : [];
     const poolSet = new Set(pool);
     const activeBots = SYSTEM_BOTS
-      .filter(b => poolSet.has(b.key) && (() => { const db_ = getBotById(b.botId); return db_ && db_.status === 'active'; })())
-      .map(b => ({ botId: b.botId, userId: b.userId, name: b.name, binaryPath: b.binaryPath }));
+      .filter(b => poolSet.has(b.key) && (() => { const db_ = getBotById(b.botId); return db_ && db_.status === 'active'; })());
     // Shuffle for variety
     for (let i = activeBots.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [activeBots[i], activeBots[j]] = [activeBots[j], activeBots[i]];
     }
-    mgr.autoFillBots(activeBots, table.min_buyin);
+    mgr.autoFillBots(activeBots, table.min_buyin, table.max_buyin);
 
     return NextResponse.json({ seat });
   } catch (err) {

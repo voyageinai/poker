@@ -985,8 +985,9 @@ export class TableManager {
       try {
         const buyin = resolveSystemBotBuyin(bot, this.state._bigBlind, minBuyin, maxBuyin);
         this.joinBot(bot.userId, bot.botId, bot.name, bot.binaryPath, buyin);
-      } catch {
-        // Bot owner can't afford buyin or other error — skip to next bot
+        console.log(`[Table ${this.tableId}] Bot ${bot.name} joined (buyin=${buyin})`);
+      } catch (err) {
+        console.error(`[Table ${this.tableId}] Bot ${bot.name} failed to join:`, (err as Error).message);
         continue;
       }
     }
