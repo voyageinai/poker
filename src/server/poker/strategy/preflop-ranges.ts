@@ -1,9 +1,12 @@
 /**
  * Position-aware preflop hand evaluation for poker bots.
  *
- * Uses GTO-informed range tables that vary by position (UTG through BB)
- * and bot style. Provides hand strength scoring and action recommendations.
+ * Uses CFR-solved GTO strategy tables when available, falling back to
+ * heuristic range tables that vary by position (UTG through BB) and bot
+ * style. Provides hand strength scoring and action recommendations.
  */
+
+import { getPreflopActionCFR } from './preflop-cfr';
 
 export type Position = 'UTG' | 'EP' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB';
 
@@ -211,6 +214,11 @@ export function getPreflopAction(
     potOdds?: number;      // toCall / (pot + toCall), for call profitability
   },
 ): { action: 'fold' | 'call' | 'raise'; frequency: number } {
+  // Try CFR-solved tables first (returns null if unavailable or hand not found)
+  const cfrResult = getPreflopActionCFR(cards, position, style, context);
+  if (cfrResult) return cfrResult;
+
+  // Fallback to heuristic engine
   const hand = canonicalize(cards);
   const mod = STYLE_MODIFIERS[style];
 
@@ -280,3 +288,7 @@ export function getPreflopAction(
 
   return { action: 'fold', frequency: 1.0 };
 }
+
+// ─── Re-exports for CFR integration ──────────────────────────────────────────
+
+export { getPreflopActionCFR, preflopHandStrengthCFR } from './preflop-cfr';

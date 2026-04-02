@@ -102,3 +102,7 @@ export function monteCarloEquity(
   const equities = hands.map((_, i) => (wins[i] + ties[i] / hands.length) / iterations);
   return { equities };
 }
+
+// ─── Fast evaluator (lookup-table based, ~100x faster) ───────────────────────
+
+export { fastMonteCarloEquity, fastFindWinners, evaluateCards, handCategory } from './fast-eval';

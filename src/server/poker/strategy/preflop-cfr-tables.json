@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "positions": ["UTG", "EP", "MP", "CO", "BTN", "SB", "BB"],
+    "iterations": 0,
+    "hands": 0,
+    "note": "Minimal placeholder. Run tools/preflop-solver/solve_preflop.py to generate full tables."
+  },
+  "strategy": {}
+}
