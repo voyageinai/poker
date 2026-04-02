@@ -119,6 +119,34 @@ describe('heuristic personality lines', () => {
 });
 
 describe('adaptive mirroring', () => {
+  it('uses an exploratory pressure style before enough hands accumulate', () => {
+    const plan = resolveAdaptivePersonality({
+      hands: 4,
+      vpipRate: 0.38,
+      pfrRate: 0.18,
+      af: 1.1,
+      cbetRate: 0.48,
+      foldToCbetRate: 0.38,
+      wtsdRate: 0.30,
+    }, 1.0);
+
+    expect(plan.mimicStyle).toBe('lag');
+  });
+
+  it('uses bully pressure as exploratory default with a chip lead', () => {
+    const plan = resolveAdaptivePersonality({
+      hands: 4,
+      vpipRate: 0.38,
+      pfrRate: 0.18,
+      af: 1.1,
+      cbetRate: 0.48,
+      foldToCbetRate: 0.38,
+      wtsdRate: 0.30,
+    }, 1.35);
+
+    expect(plan.mimicStyle).toBe('bully');
+  });
+
   it('targets maniac pressure against tight opponents', () => {
     const plan = resolveAdaptivePersonality({
       hands: 40,
@@ -145,6 +173,20 @@ describe('adaptive mirroring', () => {
     }, 1.0);
 
     expect(plan.mimicStyle).toBe('trapper');
+  });
+
+  it('attacks tight-aggressive opponents instead of defaulting to trapper', () => {
+    const plan = resolveAdaptivePersonality({
+      hands: 24,
+      vpipRate: 0.22,
+      pfrRate: 0.18,
+      af: 3.1,
+      cbetRate: 0.68,
+      foldToCbetRate: 0.52,
+      wtsdRate: 0.19,
+    }, 1.0);
+
+    expect(plan.mimicStyle).toBe('lag');
   });
 
   it('adaptive agent explains the mirrored style in debug output', async () => {

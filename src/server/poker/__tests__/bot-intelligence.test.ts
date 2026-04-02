@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, computeExploit, type HandActionRecord } from '../agents';
+import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, computeExploit, countActiveOpponents, type HandActionRecord } from '../agents';
 import { postflopStrengthMC } from '../agents';
 import { assessHumanSkill, calcHumanPressure } from '../agents';
 import type { Card, PbpServerMessage } from '@/lib/types';
@@ -150,6 +150,21 @@ describe('Multi-street memory', () => {
     expect(patterns.betBetBet).toBe(false);
     expect(patterns.checkCheckBet).toBe(false);
     expect(patterns.timesRaised).toBe(0);
+  });
+
+  it('counts only live opponents after folds', () => {
+    const actions: HandActionRecord = {
+      preflop: [
+        { seat: 1, action: 'fold', amount: 0 },
+        { seat: 2, action: 'call', amount: 20 },
+        { seat: 3, action: 'fold', amount: 0 },
+      ],
+      flop: [],
+      turn: [],
+      river: [],
+    };
+
+    expect(countActiveOpponents([0, 1, 2, 3, 4, 5], 0, actions)).toBe(3);
   });
 });
 

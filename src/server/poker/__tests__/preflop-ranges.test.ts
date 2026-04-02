@@ -141,6 +141,25 @@ describe('preflopHandStrength', () => {
     expect(stationCalls).toBeGreaterThan(nitCalls);
   });
 
+  it('trapper flats medium pairs more than tag facing an open', () => {
+    const tagResult = getPreflopAction(['8h', '8d'], 'CO', 'tag', {
+      facing3Bet: false,
+      raisersAhead: 1,
+      stackBB: 100,
+      toCallBB: 3,
+    });
+    const trapperResult = getPreflopAction(['8h', '8d'], 'CO', 'trapper', {
+      facing3Bet: false,
+      raisersAhead: 1,
+      stackBB: 100,
+      toCallBB: 3,
+    });
+
+    expect(trapperResult.action).toBe('call');
+    expect((trapperResult.frequencies?.call ?? 0)).toBeGreaterThan(tagResult.frequencies?.call ?? 0);
+    expect((trapperResult.frequencies?.raise ?? 0)).toBeLessThanOrEqual(tagResult.frequencies?.raise ?? 1);
+  });
+
   // ─── Bug fix: position bonus inflation ────────────────────────────────
 
   it('GTO folds 93o from BB (position bonus must not rescue garbage)', () => {
