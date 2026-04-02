@@ -116,6 +116,115 @@ describe('heuristic personality lines', () => {
 
     expect(['raise', 'allin']).toContain(action.action);
   });
+
+  it('nit no longer auto-jams every medium-strength low-SPR cbet spot', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+    const action = chooseBuiltinActionForTest(
+      'nit',
+      0.45,
+      0,
+      {
+        street: 'flop',
+        board: ['As', '8d', '3c'],
+        pot: 200,
+        currentBet: 0,
+        toCall: 0,
+        minRaise: 20,
+        stack: 500,
+        history: [],
+      },
+      STYLE_CONFIG_FOR_TEST.nit,
+      dryTexture,
+      0,
+      {
+        checkedThisStreet: false,
+        dryBoard: true,
+        wetBoard: false,
+        latePosition: false,
+      },
+    );
+
+    expect(action.action).not.toBe('allin');
+  });
+
+  it('gto pot-committed branch calls more often instead of auto-jamming medium strength', () => {
+    const action = chooseBuiltinActionForTest(
+      'gto',
+      0.25,
+      0.18,
+      {
+        street: 'turn',
+        board: ['Ah', '9d', '4c', '2s'],
+        pot: 300,
+        currentBet: 80,
+        toCall: 80,
+        minRaise: 80,
+        stack: 240,
+        initialStack: 500,
+        history: [{ seat: 1, action: 'raise', amount: 80 }],
+      },
+      STYLE_CONFIG_FOR_TEST.gto,
+      dryTexture,
+      0,
+      {
+        checkedThisStreet: false,
+        dryBoard: true,
+        wetBoard: false,
+        latePosition: false,
+      },
+    );
+
+    expect(action.action).toBe('call');
+  });
+
+  it('raise-to-shove conversion is now style-specific instead of a universal 50 percent rule', () => {
+    const req = {
+      street: 'flop' as const,
+      board: ['Ks', '8d', '2c'],
+      pot: 100,
+      currentBet: 80,
+      toCall: 80,
+      minRaise: 80,
+      stack: 300,
+      history: [{ seat: 1, action: 'raise' as const, amount: 80 }],
+    };
+
+    const nitAction = chooseBuiltinActionForTest(
+      'nit',
+      0.75,
+      0.18,
+      req,
+      STYLE_CONFIG_FOR_TEST.nit,
+      dryTexture,
+      0,
+      {
+        checkedThisStreet: false,
+        dryBoard: true,
+        wetBoard: false,
+        latePosition: false,
+      },
+    );
+
+    const maniacAction = chooseBuiltinActionForTest(
+      'maniac',
+      0.75,
+      0.18,
+      req,
+      STYLE_CONFIG_FOR_TEST.maniac,
+      dryTexture,
+      0,
+      {
+        checkedThisStreet: false,
+        dryBoard: true,
+        wetBoard: false,
+        latePosition: false,
+      },
+    );
+
+    expect(nitAction.action).toBe('raise');
+    expect(maniacAction.action).toBe('allin');
+  });
 });
 
 describe('adaptive mirroring', () => {

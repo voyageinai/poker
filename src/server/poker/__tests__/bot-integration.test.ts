@@ -216,12 +216,12 @@ describe('Bot integration', () => {
     expect(raiseCount).toBeGreaterThan(0);
   });
 
-  it('GTO auto-shoves when raise commits >90% of stack', async () => {
+  it('GTO can keep a non-allin raise in short preflop spots', async () => {
     const gto = createAgent('gto');
     notifyNewHand(gto, 0, 100, 2);
     gto.notify({ type: 'hole_cards', cards: ['Ah', 'Kd'] });
 
-    // With only 100 stack, any raise will commit most of the stack
+    // Short stack, but not a mandatory jam: GTO can preserve a postflop branch.
     const action = await gto.requestAction({
       street: 'preflop',
       board: [],
@@ -234,10 +234,7 @@ describe('Bot integration', () => {
       history: [],
     });
 
-    // AKo with 5BB should go all-in, not raise leaving crumbs
-    if (action.action === 'raise' || action.action === 'allin') {
-      expect(action.action).toBe('allin');
-    }
+    expect(['raise', 'allin']).toContain(action.action);
   });
 
   it('human pressure increases aggression vs human players', async () => {

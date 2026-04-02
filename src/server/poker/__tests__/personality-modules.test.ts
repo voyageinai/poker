@@ -66,6 +66,41 @@ describe('playbook personality moves', () => {
     expect(result?.action).toBe('raise');
     expect(result?.amount).toBeGreaterThanOrEqual(20);
   });
+
+  it('adaptive pressure_probe opens a low-strength info line in position', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01);
+
+    const result = matchPlaybook('adaptive', {
+      ...baseContext,
+      street: 'flop',
+      position: 'BTN',
+      facingAction: 'none',
+      opponents: 1,
+      strength: 0.08,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.patternName).toBe('pressure_probe');
+    expect(result?.action).toBe('raise');
+  });
+
+  it('gto can show a low-frequency range_small_cbet line', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.01);
+
+    const result = matchPlaybook('gto', {
+      ...baseContext,
+      street: 'flop',
+      position: 'BTN',
+      facingAction: 'none',
+      opponents: 1,
+      strength: 0.12,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.patternName).toBe('range_small_cbet');
+    expect(result?.action).toBe('raise');
+    expect(result?.amount).toBeGreaterThanOrEqual(20);
+  });
 });
 
 describe('unconditional bluff engine', () => {

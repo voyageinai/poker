@@ -281,6 +281,10 @@ interface StyleParams {
   patternSensitivity: number;
   exploitWeight: number;
   preflopCommitCap: number;
+  lowSprJamMax: number;
+  lowSprJamStrength: number;
+  committedJamStrength: number;
+  raiseShoveCommit: number;
 }
 
 interface AdaptivePersonalityPlan {
@@ -309,17 +313,17 @@ interface TimingProfile {
 }
 
 const STYLE_CONFIG: Record<SystemBotStyle, StyleParams> = {
-  nit:        { label: '司马懿', aggression: 0.28, looseness: 0.18, bluffRate: 0.01, raiseBias: 0.08, crowdSensitivity: 1.0,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3, preflopCommitCap: 0.25 },
-  tag:        { label: '赵云',   aggression: 0.52, looseness: 0.42, bluffRate: 0.04, raiseBias: 0.18, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.05, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7, preflopCommitCap: 0.25 },
-  lag:        { label: '孙悟空', aggression: 0.72, looseness: 0.65, bluffRate: 0.08, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0,    checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.7, preflopCommitCap: 0.35 },
-  station:    { label: '猪八戒', aggression: 0.16, looseness: 0.72, bluffRate: 0,    raiseBias: 0.04, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1, preflopCommitCap: 0.25 },
-  maniac:     { label: '张飞',   aggression: 0.88, looseness: 0.82, bluffRate: 0.18, raiseBias: 0.45, crowdSensitivity: 0.2,  slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.1, exploitWeight: 0.3, preflopCommitCap: 0.50 },
-  trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.45, bluffRate: 0.03, raiseBias: 0.12, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25 },
-  bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5, preflopCommitCap: 0.30 },
-  tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.25 },
-  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.40, bluffRate: 0.05, raiseBias: 0.20, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25 },
-  adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.25 },
-  gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.25 },
+  nit:        { label: '司马懿', aggression: 0.28, looseness: 0.18, bluffRate: 0.01, raiseBias: 0.08, crowdSensitivity: 1.0,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3, preflopCommitCap: 0.25, lowSprJamMax: 1.35, lowSprJamStrength: 0.64, committedJamStrength: 0.42, raiseShoveCommit: 0.80 },
+  tag:        { label: '赵云',   aggression: 0.52, looseness: 0.42, bluffRate: 0.04, raiseBias: 0.18, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.05, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7, preflopCommitCap: 0.25, lowSprJamMax: 1.65, lowSprJamStrength: 0.56, committedJamStrength: 0.34, raiseShoveCommit: 0.68 },
+  lag:        { label: '孙悟空', aggression: 0.72, looseness: 0.65, bluffRate: 0.08, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0,    checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.7, preflopCommitCap: 0.35, lowSprJamMax: 2.10, lowSprJamStrength: 0.45, committedJamStrength: 0.24, raiseShoveCommit: 0.56 },
+  station:    { label: '猪八戒', aggression: 0.16, looseness: 0.72, bluffRate: 0,    raiseBias: 0.04, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.58, committedJamStrength: 0.46, raiseShoveCommit: 0.82 },
+  maniac:     { label: '张飞',   aggression: 0.88, looseness: 0.82, bluffRate: 0.18, raiseBias: 0.45, crowdSensitivity: 0.2,  slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.1, exploitWeight: 0.3, preflopCommitCap: 0.50, lowSprJamMax: 2.80, lowSprJamStrength: 0.30, committedJamStrength: 0.14, raiseShoveCommit: 0.42 },
+  trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.45, bluffRate: 0.03, raiseBias: 0.12, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.36, raiseShoveCommit: 0.78 },
+  bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5, preflopCommitCap: 0.30, lowSprJamMax: 2.20, lowSprJamStrength: 0.38, committedJamStrength: 0.20, raiseShoveCommit: 0.50 },
+  tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.25, lowSprJamMax: 2.10, lowSprJamStrength: 0.42, committedJamStrength: 0.22, raiseShoveCommit: 0.54 },
+  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.40, bluffRate: 0.05, raiseBias: 0.20, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25, lowSprJamMax: 3.00, lowSprJamStrength: 0.24, committedJamStrength: 0.10, raiseShoveCommit: 0.36 },
+  adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.25, lowSprJamMax: 1.90, lowSprJamStrength: 0.50, committedJamStrength: 0.28, raiseShoveCommit: 0.64 },
+  gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.38, raiseShoveCommit: 0.72 },
 };
 
 const TIMING_PROFILES: Record<SystemBotStyle, TimingProfile> = {
@@ -523,6 +527,10 @@ function blendStyleParams(base: StyleParams, mimic: StyleParams, weight: number)
     patternSensitivity: clamp01(mix(base.patternSensitivity, mimic.patternSensitivity)),
     exploitWeight: clamp01(mix(base.exploitWeight, mimic.exploitWeight)),
     preflopCommitCap: clamp01(mix(base.preflopCommitCap, mimic.preflopCommitCap)),
+    lowSprJamMax: Math.max(1, mix(base.lowSprJamMax, mimic.lowSprJamMax)),
+    lowSprJamStrength: clamp01(mix(base.lowSprJamStrength, mimic.lowSprJamStrength)),
+    committedJamStrength: clamp01(mix(base.committedJamStrength, mimic.committedJamStrength)),
+    raiseShoveCommit: clamp01(mix(base.raiseShoveCommit, mimic.raiseShoveCommit)),
   };
 }
 
@@ -823,7 +831,7 @@ export class BuiltinBotAgent implements PlayerAgent {
       extraReasoning = ` 怒气值${Math.round(t * 100)}%, ${t > 0.6 ? '风雪山神庙!' : '渐失冷静.'}`;
     }
 
-    // ─── Shortstack (燕青): push/fold when ≤15BB ─────────────────────────
+    // ─── Shortstack (燕青): push/fold when ≤18BB ─────────────────────────
     if (style === 'shortstack') {
       const bbCount = req.stack / this.bigBlind;
       if (bbCount <= 18 && req.street === 'preflop') {
@@ -870,6 +878,22 @@ export class BuiltinBotAgent implements PlayerAgent {
       };
 
       // [1] Playbook signature moves
+      if (style === 'adaptive') {
+        const adaptivePbResult = matchPlaybook('adaptive', pbCtx);
+        if (adaptivePbResult) {
+          const action: PokerAction = adaptivePbResult.amount > 0
+            ? { action: adaptivePbResult.action as 'raise', amount: adaptivePbResult.amount }
+            : { action: adaptivePbResult.action as 'fold' | 'check' | 'call' | 'allin' };
+          return this.finalizeBuiltinDecision({
+            ...action,
+            debug: {
+              equity: earlyStrength,
+              reasoning: `${this.definition.name}: [${adaptivePbResult.patternName}] 先探再变.${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
+            },
+          }, 'adaptive', req);
+        }
+      }
+
       const pbResult = matchPlaybook(personalityStyle, pbCtx);
       if (pbResult) {
         const action: PokerAction = pbResult.amount > 0
@@ -1447,16 +1471,16 @@ function chooseBuiltinAction(
 
   // When deeply committed (>40% of stack in pot), shove or call — never fold
   if (req.street !== 'preflop' && commitment > 0.40 && spr < 2) {
+    const committedNoBetJamThreshold = clamp01(cfg.committedJamStrength + 0.08);
     if (req.toCall === 0) {
-      // No bet to face but pot-committed: shove for value/protection
-      if (strength > 0.25) return { action: 'allin' };
+      // Personality-driven jam threshold: nits/GTO trap more often, maniacs jam wider.
+      if (strength > committedNoBetJamThreshold) return { action: 'allin' };
       return { action: 'check' };
     }
-    // Facing a bet while pot-committed: call (or shove) with almost anything
-    if (strength > 0.20) return { action: 'allin' };
-    // Even trash hands get good odds when this committed
-    if (req.toCall <= req.stack * 0.5) return { action: 'call' };
-    return { action: 'allin' };
+    // Facing a bet while pot-committed: aggressive styles still jam wider,
+    // tighter styles mostly keep dominated hands in the call bucket.
+    if (strength > cfg.committedJamStrength) return { action: 'allin' };
+    return req.toCall >= req.stack ? { action: 'allin' } : { action: 'call' };
   }
 
   // Moderate commitment (>25% stack in pot, SPR < 4): lower fold thresholds
@@ -1502,8 +1526,8 @@ function chooseBuiltinAction(
 
   // No bet to face: check or bet
   if (req.toCall === 0) {
-    // Low SPR: prefer shoving over slowplaying
-    if (spr < 3 && strength > 0.40) {
+    // Low SPR jams are personality-driven instead of universal.
+    if (spr < cfg.lowSprJamMax && strength > cfg.lowSprJamStrength) {
       return { action: 'allin' };
     }
     // Slowplay is no longer nuts-only. Trappy styles can check medium-strong
@@ -1636,10 +1660,15 @@ function chooseRaiseAction(
     }
   }
 
-  // Don't leave crumbs: if raise commits >50% of stack, just shove.
-  // Raising and leaving a tiny stack behind is strategically wrong.
+  // Styles differ on when a large raise should collapse into a shove.
+  // Tight styles are allowed to leave a playable stack behind; maniacs
+  // and shortstack still snap over the top much more often.
   const commitAmount = raiseTotal - req.currentBet + req.toCall;
-  if (commitAmount >= req.stack * 0.5) {
+  const remainingStack = req.stack - commitAmount;
+  if (remainingStack <= Math.max(effectiveMinRaise, Math.round(req.stack * 0.12))) {
+    return { action: 'allin' };
+  }
+  if (commitAmount >= req.stack * cfg.raiseShoveCommit) {
     return { action: 'allin' };
   }
 

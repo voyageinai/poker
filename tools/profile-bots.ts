@@ -1,7 +1,7 @@
 import type { Card, PlayerState, PokerAction, ActionType } from '@/lib/types';
 import { createTableState, seatPlayer, startHand, applyAction, type TableEvent } from '@/server/poker/state-machine';
 import { BuiltinBotAgent } from '@/server/poker/agents';
-import { SYSTEM_BOTS, type SystemBotStyle } from '@/lib/system-bots';
+import { SYSTEM_BOTS, resolveSystemBotBuyin, type SystemBotStyle } from '@/lib/system-bots';
 
 interface ExtraStats {
   actionRequests: number;
@@ -29,6 +29,7 @@ interface HUDStats {
 interface ProfileOptions {
   mode: 'reset' | 'persistent';
   autoRebuy: boolean;
+  stackMode: 'uniform' | 'system';
 }
 
 function emptyHUD(): HUDStats {
@@ -55,9 +56,25 @@ function createBotAgent(style: SystemBotStyle): BuiltinBotAgent {
   return new BuiltinBotAgent(def.userId, def);
 }
 
+function resolveSeatStacks(
+  styles: SystemBotStyle[],
+  bigBlind: number,
+  stackMode: ProfileOptions['stackMode'],
+): number[] {
+  const uniformStack = bigBlind * 100;
+  if (stackMode === 'uniform') return styles.map(() => uniformStack);
+
+  const minBuyin = bigBlind * 20;
+  const maxBuyin = bigBlind * 100;
+  return styles.map(style => {
+    const def = SYSTEM_BOTS.find(b => b.style === style)!;
+    return resolveSystemBotBuyin(def, bigBlind, minBuyin, maxBuyin);
+  });
+}
+
 function seatLineup(
   styles: SystemBotStyle[],
-  stack: number,
+  seatStacks: number[],
   tableId: string,
   smallBlind: number,
   bigBlind: number,
@@ -69,7 +86,7 @@ function seatLineup(
       userId: def.userId,
       displayName: def.name,
       kind: 'bot',
-      stack,
+      stack: seatStacks[s],
       streetBet: 0,
       totalBet: 0,
       holeCards: null,
@@ -83,12 +100,13 @@ function seatLineup(
 
 function rebuyBustedPlayers(
   state: ReturnType<typeof createTableState>,
-  stack: number,
+  seatStacks: number[],
 ): void {
-  for (const p of state.players) {
+  for (let seat = 0; seat < state.players.length; seat++) {
+    const p = state.players[seat];
     if (!p) continue;
     if (p.stack > 0 && p.status !== 'sitting_out') continue;
-    p.stack = stack;
+    p.stack = seatStacks[seat];
     p.status = 'active';
     p.streetBet = 0;
     p.totalBet = 0;
@@ -102,7 +120,7 @@ async function playHand(
   state: ReturnType<typeof createTableState>,
   agents: BuiltinBotAgent[],
   handIdx: number,
-  stack: number,
+  seatStacks: number[],
   smallBlind: number,
   bigBlind: number,
   huds: HUDStats[],
@@ -110,7 +128,7 @@ async function playHand(
 ): Promise<void> {
   const numSeats = agents.length;
   const startEvents = startHand(state as Parameters<typeof startHand>[0]);
-  const handStartStacks = state.players.map(p => (p ? p.stack + p.totalBet : stack));
+  const handStartStacks = state.players.map((p, idx) => (p ? p.stack + p.totalBet : seatStacks[idx]));
 
   for (let s = 0; s < numSeats; s++) {
     agents[s].notify({
@@ -170,7 +188,7 @@ async function playHand(
         toCall,
         minRaise,
         stack: player.stack,
-        initialStack: handStartStacks[seat] ?? stack,
+        initialStack: handStartStacks[seat] ?? seatStacks[seat],
         history: [...streetHistory],
       });
       response = { action: r.action, amount: r.amount };
@@ -308,31 +326,31 @@ async function runProfile(
   bigBlind: number = 20,
 ): Promise<Array<{ style: SystemBotStyle; hud: HUDStats; extra: ExtraStats }>> {
   const numSeats = styles.length;
-  const stack = bigBlind * 100;
   const smallBlind = bigBlind / 2;
+  const seatStacks = resolveSeatStacks(styles, bigBlind, options.stackMode);
   const huds: HUDStats[] = styles.map(() => emptyHUD());
   const extras: ExtraStats[] = styles.map(() => emptyExtra());
 
   if (options.mode === 'persistent') {
-    const state = seatLineup(styles, stack, 'profile-persistent', smallBlind, bigBlind);
+    const state = seatLineup(styles, seatStacks, 'profile-persistent', smallBlind, bigBlind);
     const agents: BuiltinBotAgent[] = styles.map(s => createBotAgent(s));
     try {
       for (let handIdx = 0; handIdx < numHands; handIdx++) {
-        if (options.autoRebuy) rebuyBustedPlayers(state, stack);
-        await playHand(state, agents, handIdx, stack, smallBlind, bigBlind, huds, extras);
+        if (options.autoRebuy) rebuyBustedPlayers(state, seatStacks);
+        await playHand(state, agents, handIdx, seatStacks, smallBlind, bigBlind, huds, extras);
       }
     } finally {
       for (const agent of agents) agent.dispose();
     }
   } else {
     for (let handIdx = 0; handIdx < numHands; handIdx++) {
-      const state = seatLineup(styles, stack, `profile-${handIdx}`, smallBlind, bigBlind);
+      const state = seatLineup(styles, seatStacks, `profile-${handIdx}`, smallBlind, bigBlind);
       if (handIdx > 0) {
         (state as unknown as { buttonSeat: number }).buttonSeat = (handIdx - 1) % numSeats;
       }
       const agents: BuiltinBotAgent[] = styles.map(s => createBotAgent(s));
       try {
-        await playHand(state, agents, handIdx, stack, smallBlind, bigBlind, huds, extras);
+        await playHand(state, agents, handIdx, seatStacks, smallBlind, bigBlind, huds, extras);
       } finally {
         for (const agent of agents) agent.dispose();
       }
@@ -355,6 +373,7 @@ async function main() {
   const tableFilter = process.env.PROFILE_TABLE ?? 'all';
   const mode = process.env.PROFILE_MODE === 'persistent' ? 'persistent' : 'reset';
   const autoRebuy = process.env.PROFILE_AUTO_REBUY !== '0';
+  const stackMode = process.env.PROFILE_STACK_MODE === 'uniform' ? 'uniform' : 'system';
   const lineups: Array<{ name: string; styles: SystemBotStyle[] }> = [
     { name: 'Table-A', styles: ['nit', 'tag', 'lag', 'station', 'maniac', 'trapper'] },
     { name: 'Table-B', styles: ['bully', 'tilter', 'shortstack', 'adaptive', 'gto', 'tag'] },
@@ -365,9 +384,9 @@ async function main() {
     : lineups.filter(lineup => lineup.name === tableFilter);
 
   for (const lineup of selected) {
-    const res = await runProfile(lineup.styles, hands, { mode, autoRebuy });
-    console.log(`\n=== ${lineup.name} (${hands} hands; mode=${mode}; ${lineup.styles.join(', ')}) ===`);
-    console.log('style       VPIP   PFR   AF    WTSD  PreFold  PostFold  FoldAll  RaiseAll');
+    const res = await runProfile(lineup.styles, hands, { mode, autoRebuy, stackMode });
+    console.log(`\n=== ${lineup.name} (${hands} hands; mode=${mode}; stacks=${stackMode}; ${lineup.styles.join(', ')}) ===`);
+    console.log('style       VPIP   PFR   AF    WTSD  PreFold  PostFold  FoldAll  AllinAll RaiseOnly');
     for (const p of res) {
       const vpip = rate(p.hud.vpip, p.hud.hands);
       const pfr = rate(p.hud.pfr, p.hud.hands);
@@ -375,13 +394,15 @@ async function main() {
       const preFold = rate(p.extra.preflopFoldFacingAction, p.extra.preflopRequests);
       const postFold = rate(p.extra.postflopFoldFacingBet, p.extra.postflopFacingBet);
       const foldAll = rate(p.extra.totalFolds, p.extra.actionRequests);
-      const raiseAll = rate(p.extra.totalRaises + p.extra.totalAllins, p.extra.actionRequests);
+      const allinAll = rate(p.extra.totalAllins, p.extra.actionRequests);
+      const raiseOnly = rate(p.extra.totalRaises, p.extra.actionRequests);
 
       console.log(
         `${p.style.padEnd(10)} ${(vpip * 100).toFixed(1).padStart(5)}% ${(pfr * 100).toFixed(1).padStart(5)}% `
         + `${af(p.hud.postflopRaises, p.hud.postflopCalls).toFixed(2).padStart(5)} ${(wtsd * 100).toFixed(1).padStart(6)}% `
         + `${(preFold * 100).toFixed(1).padStart(7)}% ${(postFold * 100).toFixed(1).padStart(8)}% `
-        + `${(foldAll * 100).toFixed(1).padStart(7)}% ${(raiseAll * 100).toFixed(1).padStart(8)}%`,
+        + `${(foldAll * 100).toFixed(1).padStart(7)}% ${(allinAll * 100).toFixed(1).padStart(8)}% `
+        + `${(raiseOnly * 100).toFixed(1).padStart(9)}%`,
       );
     }
   }

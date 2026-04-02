@@ -29,7 +29,7 @@ import * as db from '@/db/queries';
 import { getTableById } from '@/db/queries';
 import { audit } from '@/db/audit';
 import { calculateEloUpdates } from './elo';
-import { SYSTEM_BOTS } from '@/lib/system-bots';
+import { SYSTEM_BOTS, getSystemBotByBotId, resolveSystemBotBuyin } from '@/lib/system-bots';
 import { getStakeLevel, LEVEL_BOT_POOL, type StakeLevelId } from '@/lib/stake-levels';
 
 type ExtState = TableState & { _smallBlind: number; _bigBlind: number };
@@ -713,6 +713,7 @@ export class TableManager {
   private cleanupPendingLeaves(): void {
     const table = db.getTableById(this.tableId);
     const minBuyin = table?.min_buyin ?? 200;
+    const maxBuyin = table?.max_buyin ?? minBuyin;
 
     for (let seat = 0; seat < this.state.players.length; seat++) {
       const p = this.state.players[seat] as (PlayerState & { _pendingLeave?: boolean; _pendingSitOut?: boolean }) | null;
@@ -721,19 +722,24 @@ export class TableManager {
         this.creditAndUnseat(seat, p, p.userId);
       } else if (p.stack <= 0 && p.kind === 'bot') {
         // Bot busted → auto-rebuy from owner's account
+        const botId = this.agents.get(seat)?.botId;
+        const systemBot = botId ? getSystemBotByBotId(botId) : undefined;
+        const rebuyAmount = systemBot
+          ? resolveSystemBotBuyin(systemBot, this.state._bigBlind, minBuyin, maxBuyin)
+          : minBuyin;
         const owner = db.getUserById(p.userId);
-        if (owner && owner.chips >= minBuyin) {
-          db.updateUserChips(p.userId, owner.chips - minBuyin);
-          p.stack = minBuyin;
+        if (owner && owner.chips >= rebuyAmount) {
+          db.updateUserChips(p.userId, owner.chips - rebuyAmount);
+          p.stack = rebuyAmount;
           p.status = 'active';
           audit({
             userId: p.userId,
             category: 'chips',
             action: 'bot_buyin',
             targetId: this.tableId,
-            detail: { tableId: this.tableId, botId: this.agents.get(seat)?.botId, botName: p.displayName, amount: minBuyin, balanceBefore: owner.chips, balanceAfter: owner.chips - minBuyin, autoRebuy: true },
+            detail: { tableId: this.tableId, botId, botName: p.displayName, amount: rebuyAmount, balanceBefore: owner.chips, balanceAfter: owner.chips - rebuyAmount, autoRebuy: true },
           });
-          console.log(`[Table ${this.tableId}] Bot ${p.displayName} (seat ${seat}) auto-rebuy ${minBuyin}`);
+          console.log(`[Table ${this.tableId}] Bot ${p.displayName} (seat ${seat}) auto-rebuy ${rebuyAmount}`);
         } else {
           // Owner can't afford rebuy — remove the bot
           const info = this.agents.get(seat);
@@ -941,7 +947,8 @@ export class TableManager {
 
   /**
    * Auto-fill empty seats with system bots if at least one human is present.
-   * Uses the table's min_buyin from DB. Called after hand_complete cleanup.
+   * Uses per-style preferred buyins, clamped by the table's min/max buyin.
+   * Called after hand_complete cleanup.
    */
   private tryAutoFillBots(): void {
     const hasHuman = this.state.players.some(p => p !== null && p.kind === 'human');
@@ -950,7 +957,6 @@ export class TableManager {
 
     const table = db.getTableById(this.tableId);
     if (!table) return;
-    const buyin = table.min_buyin;
 
     // Use level-appropriate bot pool, shuffled for variety
     const pool = table.level ? LEVEL_BOT_POOL[table.level as StakeLevelId] ?? [] : [];
@@ -965,18 +971,19 @@ export class TableManager {
       const j = Math.floor(Math.random() * (i + 1));
       [activeBots[i], activeBots[j]] = [activeBots[j], activeBots[i]];
     }
-    this.autoFillBots(activeBots, buyin);
+    this.autoFillBots(activeBots, table.min_buyin, table.max_buyin);
   }
 
   /**
    * Fill empty seats with system bots (no duplicates).
    * Called after a human joins to ensure the table is full.
    */
-  autoFillBots(bots: Array<{ botId: string; userId: string; name: string; binaryPath: string }>, buyin: number): void {
+  autoFillBots(bots: typeof SYSTEM_BOTS, minBuyin: number, maxBuyin: number): void {
     for (const bot of bots) {
       if (this.findEmptySeat() === -1) break;
       if (this.findSeatByBotId(bot.botId) !== -1) continue;
       try {
+        const buyin = resolveSystemBotBuyin(bot, this.state._bigBlind, minBuyin, maxBuyin);
         this.joinBot(bot.userId, bot.botId, bot.name, bot.binaryPath, buyin);
       } catch {
         // Bot owner can't afford buyin or other error — skip to next bot

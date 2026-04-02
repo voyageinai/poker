@@ -113,8 +113,8 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
         priorMyActions: [{ street: 'preflop', action: 'call' }],
       },
       action: { type: 'raise', sizing: { mode: 'prev_bet_multiple', multiple: 4.0 } },
-      frequency: 0.40,
-      strengthGate: [0.60, 1.0],
+      frequency: 0.48,
+      strengthGate: [0.52, 1.0],
     },
     {
       name: 'delayed_cbet',
@@ -124,15 +124,15 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
         priorMyActions: [{ street: 'flop', action: 'check' }],
       },
       action: { type: 'raise', sizing: { mode: 'pot_fraction', fraction: 0.75 } },
-      frequency: 0.35,
-      strengthGate: [0.50, 1.0],
+      frequency: 0.42,
+      strengthGate: [0.38, 1.0],
     },
     {
       name: 'min_raise_trap',
       trigger: { streets: ['flop', 'turn', 'river'], facingAction: 'bet' },
       action: { type: 'raise', sizing: { mode: 'minraise' } },
-      frequency: 0.50,
-      strengthGate: [0.80, 1.0],
+      frequency: 0.58,
+      strengthGate: [0.68, 1.0],
     },
     {
       name: 'check_call_then_raise',
@@ -142,8 +142,8 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
         priorMyActions: [{ street: 'flop', action: 'call' }],
       },
       action: { type: 'raise', sizing: { mode: 'prev_bet_multiple', multiple: 2.5 } },
-      frequency: 0.30,
-      strengthGate: [0.70, 1.0],
+      frequency: 0.38,
+      strengthGate: [0.58, 1.0],
     },
   ],
 
@@ -305,14 +305,74 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
     },
   ],
 
-  // 曹操 adaptive: 变色龙（mirror 在 agents.ts 中基于 opponent model 实现）
-  adaptive: [],
+  // 曹操 adaptive: 先探，再压，再换脸
+  adaptive: [
+    {
+      name: 'pressure_probe',
+      trigger: {
+        streets: ['flop', 'turn'],
+        positions: ['CO', 'BTN'],
+        facingAction: 'none',
+        maxOpponents: 2,
+      },
+      action: { type: 'raise', sizing: { mode: 'pot_fraction', fraction: 0.55 } },
+      frequency: 0.18,
+      strengthGate: null,
+    },
+    {
+      name: 'delayed_takeover',
+      trigger: {
+        streets: ['turn'],
+        positions: ['CO', 'BTN'],
+        facingAction: 'none',
+        priorMyActions: [{ street: 'flop', action: 'check' }],
+      },
+      action: { type: 'raise', sizing: { mode: 'pot_fraction', fraction: 0.70 } },
+      frequency: 0.24,
+      strengthGate: null,
+    },
+    {
+      name: 'iso_reraise',
+      trigger: {
+        streets: ['preflop'],
+        positions: ['CO', 'BTN', 'SB'],
+        facingAction: 'raise',
+      },
+      action: { type: 'raise', sizing: { mode: 'prev_bet_multiple', multiple: 3.2 } },
+      frequency: 0.18,
+      strengthGate: [0.22, 1.0],
+    },
+  ],
 
   // 赵云 tag: 稳健，无签名招数
   tag: [],
 
-  // 诸葛亮 gto: 均衡，无签名招数
-  gto: [],
+  // 诸葛亮 gto: 低频可见线，仍保持小尺度和平衡感
+  gto: [
+    {
+      name: 'range_small_cbet',
+      trigger: {
+        streets: ['flop'],
+        positions: ['CO', 'BTN'],
+        facingAction: 'none',
+        maxOpponents: 2,
+      },
+      action: { type: 'raise', sizing: { mode: 'pot_fraction', fraction: 0.33 } },
+      frequency: 0.12,
+      strengthGate: null,
+    },
+    {
+      name: 'river_block_bet',
+      trigger: {
+        streets: ['river'],
+        positions: ['CO', 'BTN', 'SB', 'BB'],
+        facingAction: 'none',
+      },
+      action: { type: 'raise', sizing: { mode: 'pot_fraction', fraction: 0.25 } },
+      frequency: 0.10,
+      strengthGate: [0.38, 0.72],
+    },
+  ],
 };
 
 // ─── Matching Engine ────────────────────────────────────────────────────────

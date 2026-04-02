@@ -75,12 +75,19 @@ const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
     thirdBarrelRate: 0.08,
     sizingFraction: 0.50,
   },
+  gto: {
+    positionRate: { UTG: 0, MP: 0.01, CO: 0.04, BTN: 0.06, SB: 0.02, BB: 0 },
+    dryBoardBonus: 0.02,
+    wetBoardPenalty: 0.03,
+    secondBarrelRate: 0.28,
+    thirdBarrelRate: 0.14,
+    sizingFraction: 0.40,
+  },
   // These styles don't use positional bluffs — handled elsewhere
   station: null,
   tilter: null,      // tilter bluffs via playbook (revenge_raise)
   shortstack: null,  // uses push/fold
   adaptive: null,    // mirrors opponent
-  gto: null,         // balanced bluffs from solver
 };
 
 // ─── Public API ─────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ export interface SystemBotDefinition {
   description: string;
   style: SystemBotStyle;
   binaryPath: string;
+  preferredBuyinBB?: number;
 }
 
 export const SYSTEM_BOT_PATH_PREFIX = 'builtin:';
@@ -24,6 +25,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '隐忍蛰伏，只在必胜时出手。极度保守的策略大师',
     style: 'nit',
     binaryPath: 'builtin:house-nit',
+    preferredBuyinBB: 35,
   },
   {
     key: 'house-tag',
@@ -34,6 +36,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '攻守兼备的常胜将军。牌力精准，价值下注一击必中',
     style: 'tag',
     binaryPath: 'builtin:house-tag',
+    preferredBuyinBB: 45,
   },
   {
     key: 'house-lag',
@@ -44,6 +47,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '大闹天宫的齐天大圣。出牌范围无边界，全程高压不喘气',
     style: 'lag',
     binaryPath: 'builtin:house-lag',
+    preferredBuyinBB: 55,
   },
   {
     key: 'house-station',
@@ -54,6 +58,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '管不住手的天蓬元帅。什么牌都想看看，送你筹码最大方',
     style: 'station',
     binaryPath: 'builtin:house-station',
+    preferredBuyinBB: 45,
   },
   {
     key: 'house-maniac',
@@ -64,6 +69,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '暴烈如火的猛将。逢牌必加，疯狂下注，心脏不好慎入',
     style: 'maniac',
     binaryPath: 'builtin:house-maniac',
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-trapper',
@@ -74,6 +80,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '机关算尽的凤辣子。慢打大牌设埋伏，你以为她弱她反杀你',
     style: 'trapper',
     binaryPath: 'builtin:house-trapper',
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-bully',
@@ -84,6 +91,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '拳打镇关西的花和尚。专挑短码欺负，筹码碾压绝不留情',
     style: 'bully',
     binaryPath: 'builtin:house-bully',
+    preferredBuyinBB: 60,
   },
   {
     key: 'house-tilter',
@@ -94,6 +102,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '忍辱负重的豹子头。平时沉稳如水，连输几把后怒火燎原',
     style: 'tilter',
     binaryPath: 'builtin:house-tilter',
+    preferredBuyinBB: 45,
   },
   {
     key: 'house-shortstack',
@@ -104,6 +113,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '身手敏捷的浪子。筹码虽少但招招致命，擅长以小博大全下逼迫',
     style: 'shortstack',
     binaryPath: 'builtin:house-shortstack',
+    preferredBuyinBB: 20,
   },
   {
     key: 'house-adaptive',
@@ -114,6 +124,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '乱世奸雄，因势利导。观察你的弱点，然后精准剥削',
     style: 'adaptive',
     binaryPath: 'builtin:house-adaptive',
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-gto',
@@ -124,6 +135,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '运筹帷幄的卧龙。攻守完美平衡，混合策略无懈可击',
     style: 'gto',
     binaryPath: 'builtin:house-gto',
+    preferredBuyinBB: 60,
   },
 ];
 
@@ -137,6 +149,20 @@ export function isSystemBotUserId(userId: string): boolean {
 
 export function getSystemBotByBinaryPath(binaryPath: string): SystemBotDefinition | undefined {
   return SYSTEM_BOTS.find(bot => bot.binaryPath === binaryPath);
+}
+
+export function getSystemBotByBotId(botId: string): SystemBotDefinition | undefined {
+  return SYSTEM_BOTS.find(bot => bot.botId === botId);
+}
+
+export function resolveSystemBotBuyin(
+  bot: SystemBotDefinition,
+  bigBlind: number,
+  minBuyin: number,
+  maxBuyin: number,
+): number {
+  const target = Math.round((bot.preferredBuyinBB ?? Math.max(1, Math.round(minBuyin / Math.max(bigBlind, 1)))) * bigBlind);
+  return Math.max(minBuyin, Math.min(maxBuyin, target));
 }
 
 export function isSystemBotRecord(bot: { user_id: string; binary_path: string }): boolean {
