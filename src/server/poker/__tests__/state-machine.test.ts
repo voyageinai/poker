@@ -299,7 +299,7 @@ describe('toClientState', () => {
     addPlayer(state, 1, 'bob', 1000);
     startHand(state);
     const clientState = toClientState(state, 'alice');
-    expect((clientState as Record<string, unknown>).deck).toBeUndefined();
+    expect((clientState as unknown as Record<string, unknown>).deck).toBeUndefined();
   });
 });
 

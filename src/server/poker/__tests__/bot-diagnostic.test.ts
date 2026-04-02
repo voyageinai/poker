@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { BuiltinBotAgent, computeBluffDecay, type HandActionRecord } from '../agents';
 import { SYSTEM_BOTS, type SystemBotStyle } from '@/lib/system-bots';
+import type { Card, ActionType } from '@/lib/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,9 +53,9 @@ function notifyHand(
     bigBlind: 20,
     buttonSeat: btnSeat,
   });
-  agent.notify({ type: 'hole_cards', cards });
+  agent.notify({ type: 'hole_cards', cards: cards as [Card, Card] });
   if (opts.board && opts.street) {
-    agent.notify({ type: 'street', name: opts.street, board: opts.board });
+    agent.notify({ type: 'street', name: opts.street as 'flop' | 'turn' | 'river', board: opts.board as Card[] });
   }
 }
 
@@ -91,7 +92,7 @@ describe('Statistical profiling: VPIP by style', () => {
   // Standard preflop scenario: facing an open raise from MP
   const preflopReq = {
     street: 'preflop' as const,
-    board: [] as string[],
+    board: [] as Card[],
     pot: 50,
     currentBet: 20,
     toCall: 20,
@@ -137,13 +138,13 @@ describe('Position audit: same hand, different position', () => {
   it('TAG plays KTo from BTN but folds from UTG', async () => {
     const preflopReq = {
       street: 'preflop' as const,
-      board: [] as string[],
+      board: [] as Card[],
       pot: 30,
       currentBet: 20,
       toCall: 10, // just BB to call (we're SB? or limping scenario)
       minRaise: 20,
       stack: 990,
-      history: [] as Array<{ seat: number; action: string; amount: number }>,
+      history: [] as Array<{ seat: number; action: ActionType; amount: number }>,
     };
 
     // From BTN (seat 5, button=5 in 6-max → seat 5 is BTN)
@@ -171,18 +172,18 @@ describe('Board texture: cbet behavior on dry vs wet boards', () => {
   it('TAG cbets more on dry board than wet board', async () => {
     const dryReq = {
       street: 'flop' as const,
-      board: ['Kh', '7d', '2c'],
+      board: ['Kh', '7d', '2c'] as Card[],
       pot: 60,
       currentBet: 0,
       toCall: 0,
       minRaise: 20,
       stack: 970,
-      history: [] as Array<{ seat: number; action: string; amount: number }>,
+      history: [] as Array<{ seat: number; action: ActionType; amount: number }>,
     };
 
     const wetReq = {
       ...dryReq,
-      board: ['Jh', 'Th', '9h'],
+      board: ['Jh', 'Th', '9h'] as Card[],
     };
 
     const dryStats = await profileActions('tag', ['Ah', 'Kd'], dryReq, {
@@ -211,13 +212,13 @@ describe('Stack-depth: shallow vs deep behavior', () => {
   it('67s plays tighter at 10BB than at 150BB', async () => {
     const makeReq = (stack: number) => ({
       street: 'preflop' as const,
-      board: [] as string[],
+      board: [] as Card[],
       pot: 30,
       currentBet: 20,
       toCall: 10,
       minRaise: 20,
       stack,
-      history: [] as Array<{ seat: number; action: string; amount: number }>,
+      history: [] as Array<{ seat: number; action: ActionType; amount: number }>,
     });
 
     const shallowStats = await profileActions('tag', ['6h', '7h'], makeReq(200), {
