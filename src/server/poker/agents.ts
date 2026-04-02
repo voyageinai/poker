@@ -821,6 +821,12 @@ export class BuiltinBotAgent implements PlayerAgent {
       if (texture.wetness > 0.55) cfg.bluffRate = clamp01(cfg.bluffRate - 0.03);
     }
 
+    // Bluff decay: reduce bluff rate when opponents called on prior streets
+    const bluffDecay = computeBluffDecay(this.handActions, this.mySeat, req.street);
+    if (bluffDecay > 0) {
+      cfg.bluffRate = clamp01(cfg.bluffRate - bluffDecay);
+    }
+
     // Multi-street pattern adjustment (lower effective strength when danger patterns detected)
     if (req.toCall > 0) {
       const lastAggressor = req.history.filter(h => h.action === 'raise' || h.action === 'allin').pop();
@@ -912,6 +918,36 @@ export type HandActionRecord = Record<
   'preflop' | 'flop' | 'turn' | 'river',
   Array<{ seat: number; action: ActionType; amount: number }>
 >;
+
+/**
+ * Compute bluff decay based on opponent calls on prior streets.
+ * When opponents called our bets on previous streets, they've shown strength,
+ * so we should bluff less on later streets. Returns 0..0.15 decay amount.
+ */
+export function computeBluffDecay(
+  actions: HandActionRecord,
+  mySeat: number,
+  currentStreet: 'preflop' | 'flop' | 'turn' | 'river',
+): number {
+  const STREET_ORDER: Array<'preflop' | 'flop' | 'turn' | 'river'> = ['preflop', 'flop', 'turn', 'river'];
+  const currentIdx = STREET_ORDER.indexOf(currentStreet);
+
+  // Only count postflop calls on streets before the current one (skip preflop)
+  let opponentCalls = 0;
+  for (let i = 1; i < currentIdx; i++) {  // start at 1 to skip preflop
+    const streetActions = actions[STREET_ORDER[i]];
+    for (const a of streetActions) {
+      if (a.seat !== mySeat && a.action === 'call') {
+        opponentCalls++;
+      }
+    }
+  }
+
+  if (opponentCalls === 0) return 0;
+
+  // Each opponent call reduces bluff rate by 0.04, capped at 0.15
+  return Math.min(opponentCalls * 0.04, 0.15);
+}
 
 export interface OpponentHandPattern {
   checkThenBet: boolean;

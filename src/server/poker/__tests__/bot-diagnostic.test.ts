@@ -6,7 +6,7 @@
  * stack-depth adjustment, and edge case handling.
  */
 import { describe, it, expect } from 'vitest';
-import { BuiltinBotAgent } from '../agents';
+import { BuiltinBotAgent, computeBluffDecay, type HandActionRecord } from '../agents';
 import { SYSTEM_BOTS, type SystemBotStyle } from '@/lib/system-bots';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -372,6 +372,83 @@ describe('Tilter tilt mechanism', () => {
     // We just verify the tilt mechanism works: aggression should be elevated
     expect(tiltRaiseRate).toBeGreaterThan(0.2);
   }, 60000);
+});
+
+// ─── 8. Bluff Decay: bots should bluff less on later streets after opponent called ──
+
+describe('Bluff decay: computeBluffDecay', () => {
+  it('returns 0 when no opponent calls on prior streets', () => {
+    const actions: HandActionRecord = { preflop: [], flop: [], turn: [], river: [] };
+    expect(computeBluffDecay(actions, 0, 'river')).toBe(0);
+  });
+
+  it('returns positive decay when opponent called on prior streets', () => {
+    const actions: HandActionRecord = {
+      preflop: [],
+      flop: [{ seat: 1, action: 'call' as const, amount: 30 }],
+      turn: [{ seat: 1, action: 'call' as const, amount: 60 }],
+      river: [],
+    };
+    expect(computeBluffDecay(actions, 0, 'river')).toBeGreaterThan(0);
+  });
+
+  it('more calls = more decay', () => {
+    const oneCall: HandActionRecord = {
+      preflop: [],
+      flop: [{ seat: 1, action: 'call' as const, amount: 30 }],
+      turn: [],
+      river: [],
+    };
+    const twoCalls: HandActionRecord = {
+      preflop: [],
+      flop: [{ seat: 1, action: 'call' as const, amount: 30 }],
+      turn: [{ seat: 1, action: 'call' as const, amount: 60 }],
+      river: [],
+    };
+    const decayOne = computeBluffDecay(oneCall, 0, 'turn');
+    const decayTwo = computeBluffDecay(twoCalls, 0, 'river');
+    expect(decayTwo).toBeGreaterThan(decayOne);
+  });
+
+  it('own calls are ignored (only opponent calls matter)', () => {
+    const ownCalls: HandActionRecord = {
+      preflop: [],
+      flop: [{ seat: 0, action: 'call' as const, amount: 30 }],  // our own call
+      turn: [],
+      river: [],
+    };
+    expect(computeBluffDecay(ownCalls, 0, 'turn')).toBe(0);
+  });
+
+  it('preflop calls do not count (normal preflop action)', () => {
+    const preflopOnly: HandActionRecord = {
+      preflop: [{ seat: 1, action: 'call' as const, amount: 20 }],
+      flop: [],
+      turn: [],
+      river: [],
+    };
+    expect(computeBluffDecay(preflopOnly, 0, 'flop')).toBe(0);
+  });
+
+  it('decay is capped at a reasonable maximum', () => {
+    // Even with many calls, decay shouldn't exceed the cap
+    const manyCalls: HandActionRecord = {
+      preflop: [],
+      flop: [
+        { seat: 1, action: 'call' as const, amount: 30 },
+        { seat: 2, action: 'call' as const, amount: 30 },
+        { seat: 3, action: 'call' as const, amount: 30 },
+      ],
+      turn: [
+        { seat: 1, action: 'call' as const, amount: 60 },
+        { seat: 2, action: 'call' as const, amount: 60 },
+      ],
+      river: [],
+    };
+    const decay = computeBluffDecay(manyCalls, 0, 'river');
+    expect(decay).toBeLessThanOrEqual(0.15);
+    expect(decay).toBeGreaterThan(0);
+  });
 });
 
 // ─── 8. GTO Balanced Strategy Validation ─────────────────────────────────────

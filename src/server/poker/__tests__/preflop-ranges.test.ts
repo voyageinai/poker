@@ -141,6 +141,92 @@ describe('preflopHandStrength', () => {
     expect(stationCalls).toBeGreaterThan(nitCalls);
   });
 
+  // ─── Bug fix: position bonus inflation ────────────────────────────────
+
+  it('GTO folds 93o from BB (position bonus must not rescue garbage)', () => {
+    const result = getPreflopAction(['9h', '3d'], 'BB', 'gto', {
+      facing3Bet: false,
+      raisersAhead: 0,
+      stackBB: 100,
+    });
+    expect(result.action, 'GTO should fold 93o from BB').toBe('fold');
+  });
+
+  it('GTO folds 72o from BB', () => {
+    const result = getPreflopAction(['7h', '2d'], 'BB', 'gto', {
+      facing3Bet: false,
+      raisersAhead: 0,
+      stackBB: 100,
+    });
+    expect(result.action, 'GTO should fold 72o from BB').toBe('fold');
+  });
+
+  it('TAG folds 84o from BB', () => {
+    const result = getPreflopAction(['8h', '4d'], 'BB', 'tag', {
+      facing3Bet: false,
+      raisersAhead: 0,
+      stackBB: 100,
+    });
+    expect(result.action, 'TAG should fold 84o from BB').toBe('fold');
+  });
+
+  // ─── Bug fix: rfiThreshold floor ──────────────────────────────────────
+
+  it('maniac folds at least some garbage facing a raise (rfiThreshold has floor)', () => {
+    // Maniac facing an open raise should not 3-bet every garbage hand
+    const garbageHands: [string, string][] = [
+      ['7h', '2d'], ['8h', '3d'], ['9h', '2c'], ['6h', '2d'], ['5h', '2d'],
+    ];
+    let folds = 0;
+    for (const hand of garbageHands) {
+      const result = getPreflopAction(hand, 'CO', 'maniac', {
+        facing3Bet: false,
+        raisersAhead: 1,
+        stackBB: 100,
+        toCallBB: 3,
+      });
+      if (result.action === 'fold') folds++;
+    }
+    // At least 2 out of 5 garbage hands should fold when facing a raise
+    expect(folds, 'Maniac should fold some garbage facing a raise').toBeGreaterThanOrEqual(2);
+  });
+
+  // ─── Bug fix: LAG/Maniac multi-raise commitment ──────────────────────
+
+  it('LAG folds 97o facing 4-bet', () => {
+    const result = getPreflopAction(['9h', '7d'], 'BB', 'lag', {
+      facing3Bet: true,
+      raisersAhead: 3,
+      stackBB: 100,
+      toCallBB: 30,
+    });
+    expect(result.action, 'LAG should fold 97o facing 4-bet').toBe('fold');
+  });
+
+  it('maniac folds 84o facing 3-bet from EP', () => {
+    const result = getPreflopAction(['8h', '4d'], 'EP', 'maniac', {
+      facing3Bet: true,
+      raisersAhead: 2,
+      stackBB: 100,
+      toCallBB: 15,
+    });
+    expect(result.action, 'Maniac should fold 84o facing 3-bet from EP').toBe('fold');
+  });
+
+  it('position bonus is proportional: garbage gets less than good hands', () => {
+    // AJs (strong but not capped) should gain more from position than 72o (junk)
+    const ajsUTG = preflopHandStrength(['Ah', 'Jh'], 'UTG', 'gto');
+    const ajsBB = preflopHandStrength(['Ah', 'Jh'], 'BB', 'gto');
+    const junkUTG = preflopHandStrength(['7h', '2d'], 'UTG', 'gto');
+    const junkBB = preflopHandStrength(['7h', '2d'], 'BB', 'gto');
+
+    const ajsDelta = ajsBB - ajsUTG;
+    const junkDelta = junkBB - junkUTG;
+
+    // Good hands should benefit MORE from position than junk
+    expect(ajsDelta, 'AJs should gain more from position than 72o').toBeGreaterThan(junkDelta);
+  });
+
   it('result always between 0 and 1', () => {
     const positions: Position[] = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
     const styles: SystemBotStyle[] = ['nit', 'tag', 'lag', 'gto', 'maniac'];

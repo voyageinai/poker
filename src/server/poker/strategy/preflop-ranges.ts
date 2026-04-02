@@ -185,9 +185,10 @@ export function preflopHandStrength(
   if (hand.suited && !hand.pair) s += mod.suitedBonus;
   if (isSpeculative(hand)) s += mod.speculative;
 
-  // Position adjustment: later position adds strength (lower RFI threshold = more playable)
-  const posBonus = (0.58 - POSITION_RFI[position]) * 0.3;
-  s += posBonus;
+  // Position adjustment: multiplicative so garbage hands don't get rescued by position.
+  // Later position multiplies strength by up to 1.35 (BB), leaving junk hands weak.
+  const posFactor = (0.58 - POSITION_RFI[position]) * 0.9;  // 0..0.342
+  s *= (1 + posFactor);
 
   return Math.max(0, Math.min(1, s));
 }
@@ -245,8 +246,8 @@ export function getPreflopAction(
   // Station style prefers calling over raising against aggression
   const isCallStation = style === 'station';
 
-  // Compute threshold: base RFI adjusted by style
-  const rfiThreshold = POSITION_RFI[position] - mod.rfiShift;
+  // Compute threshold: base RFI adjusted by style (floor of 0.06 prevents raising any-two)
+  const rfiThreshold = Math.max(0.06, POSITION_RFI[position] - mod.rfiShift);
 
   // Call zone width varies by style
   const callZoneWidth: Record<SystemBotStyle, number> = {
@@ -260,7 +261,7 @@ export function getPreflopAction(
     tilter:     0.10,
     shortstack: 0.06,
     adaptive:   0.10,
-    gto:        0.10,
+    gto:        0.06,
   };
   const callThreshold = rfiThreshold - callZoneWidth[style];
 
