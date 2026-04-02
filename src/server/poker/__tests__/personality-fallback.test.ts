@@ -225,6 +225,99 @@ describe('heuristic personality lines', () => {
     expect(nitAction.action).toBe('raise');
     expect(maniacAction.action).toBe('allin');
   });
+
+  it('gto can peel a dry flop near the calling threshold when raising is closed', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const action = chooseBuiltinActionForTest(
+      'gto',
+      0.13,
+      0.20,
+      {
+        street: 'flop',
+        board: ['As', '8d', '3c'],
+        pot: 120,
+        currentBet: 30,
+        toCall: 30,
+        minRaise: 5000,
+        stack: 870,
+        history: [{ seat: 1, action: 'raise', amount: 30 }],
+      },
+      STYLE_CONFIG_FOR_TEST.gto,
+      dryTexture,
+      0,
+      {
+        checkedThisStreet: false,
+        dryBoard: true,
+        wetBoard: false,
+        latePosition: true,
+      },
+    );
+
+    expect(action.action).toBe('call');
+  });
+
+  it('tag can peel a dry flop instead of defaulting to fold in marginal spots', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const action = chooseBuiltinActionForTest(
+      'tag',
+      0.14,
+      0.20,
+      {
+        street: 'flop',
+        board: ['Ks', '7d', '2c'],
+        pot: 120,
+        currentBet: 30,
+        toCall: 30,
+        minRaise: 5000,
+        stack: 870,
+        history: [{ seat: 1, action: 'raise', amount: 30 }],
+      },
+      STYLE_CONFIG_FOR_TEST.tag,
+      dryTexture,
+      0,
+      {
+        checkedThisStreet: false,
+        dryBoard: true,
+        wetBoard: false,
+        latePosition: true,
+      },
+    );
+
+    expect(action.action).toBe('call');
+  });
+
+  it('trapper can peel a dry turn after calling earlier streets', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const action = chooseBuiltinActionForTest(
+      'trapper',
+      0.18,
+      0.24,
+      {
+        street: 'turn',
+        board: ['Ks', '7d', '2c', '4h'],
+        pot: 180,
+        currentBet: 50,
+        toCall: 50,
+        minRaise: 5000,
+        stack: 780,
+        history: [{ seat: 1, action: 'raise', amount: 50 }],
+      },
+      STYLE_CONFIG_FOR_TEST.trapper,
+      dryTexture,
+      0,
+      {
+        checkedThisStreet: false,
+        dryBoard: true,
+        wetBoard: false,
+        latePosition: true,
+      },
+    );
+
+    expect(action.action).toBe('call');
+  });
 });
 
 describe('adaptive mirroring', () => {

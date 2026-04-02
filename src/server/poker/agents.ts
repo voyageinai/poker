@@ -285,6 +285,9 @@ interface StyleParams {
   lowSprJamStrength: number;
   committedJamStrength: number;
   raiseShoveCommit: number;
+  callThresholdShift: number;
+  peelMargin: number;
+  peelRate: number;
 }
 
 interface AdaptivePersonalityPlan {
@@ -313,17 +316,17 @@ interface TimingProfile {
 }
 
 const STYLE_CONFIG: Record<SystemBotStyle, StyleParams> = {
-  nit:        { label: '司马懿', aggression: 0.28, looseness: 0.18, bluffRate: 0.01, raiseBias: 0.08, crowdSensitivity: 1.0,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3, preflopCommitCap: 0.25, lowSprJamMax: 1.35, lowSprJamStrength: 0.64, committedJamStrength: 0.42, raiseShoveCommit: 0.80 },
-  tag:        { label: '赵云',   aggression: 0.52, looseness: 0.42, bluffRate: 0.04, raiseBias: 0.18, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.05, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7, preflopCommitCap: 0.25, lowSprJamMax: 1.65, lowSprJamStrength: 0.56, committedJamStrength: 0.34, raiseShoveCommit: 0.68 },
-  lag:        { label: '孙悟空', aggression: 0.72, looseness: 0.65, bluffRate: 0.08, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0,    checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.7, preflopCommitCap: 0.35, lowSprJamMax: 2.10, lowSprJamStrength: 0.45, committedJamStrength: 0.24, raiseShoveCommit: 0.56 },
-  station:    { label: '猪八戒', aggression: 0.16, looseness: 0.72, bluffRate: 0,    raiseBias: 0.04, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.58, committedJamStrength: 0.46, raiseShoveCommit: 0.82 },
-  maniac:     { label: '张飞',   aggression: 0.88, looseness: 0.82, bluffRate: 0.18, raiseBias: 0.45, crowdSensitivity: 0.2,  slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.1, exploitWeight: 0.3, preflopCommitCap: 0.50, lowSprJamMax: 2.80, lowSprJamStrength: 0.30, committedJamStrength: 0.14, raiseShoveCommit: 0.42 },
-  trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.45, bluffRate: 0.03, raiseBias: 0.12, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.36, raiseShoveCommit: 0.78 },
-  bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5, preflopCommitCap: 0.30, lowSprJamMax: 2.20, lowSprJamStrength: 0.38, committedJamStrength: 0.20, raiseShoveCommit: 0.50 },
-  tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.25, lowSprJamMax: 2.10, lowSprJamStrength: 0.42, committedJamStrength: 0.22, raiseShoveCommit: 0.54 },
-  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.40, bluffRate: 0.05, raiseBias: 0.20, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25, lowSprJamMax: 3.00, lowSprJamStrength: 0.24, committedJamStrength: 0.10, raiseShoveCommit: 0.36 },
-  adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.25, lowSprJamMax: 1.90, lowSprJamStrength: 0.50, committedJamStrength: 0.28, raiseShoveCommit: 0.64 },
-  gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.38, raiseShoveCommit: 0.72 },
+  nit:        { label: '司马懿', aggression: 0.28, looseness: 0.18, bluffRate: 0.01, raiseBias: 0.08, crowdSensitivity: 1.0,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3, preflopCommitCap: 0.25, lowSprJamMax: 1.35, lowSprJamStrength: 0.64, committedJamStrength: 0.42, raiseShoveCommit: 0.80, callThresholdShift: -0.01, peelMargin: 0.04, peelRate: 0.10 },
+  tag:        { label: '赵云',   aggression: 0.52, looseness: 0.42, bluffRate: 0.04, raiseBias: 0.18, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.05, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7, preflopCommitCap: 0.25, lowSprJamMax: 1.65, lowSprJamStrength: 0.56, committedJamStrength: 0.34, raiseShoveCommit: 0.68, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.20 },
+  lag:        { label: '孙悟空', aggression: 0.72, looseness: 0.65, bluffRate: 0.08, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0,    checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.7, preflopCommitCap: 0.35, lowSprJamMax: 2.10, lowSprJamStrength: 0.45, committedJamStrength: 0.24, raiseShoveCommit: 0.56, callThresholdShift: -0.015, peelMargin: 0.08, peelRate: 0.18 },
+  station:    { label: '猪八戒', aggression: 0.16, looseness: 0.72, bluffRate: 0,    raiseBias: 0.04, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.58, committedJamStrength: 0.46, raiseShoveCommit: 0.82, callThresholdShift: -0.04, peelMargin: 0.12, peelRate: 0.30 },
+  maniac:     { label: '张飞',   aggression: 0.88, looseness: 0.82, bluffRate: 0.18, raiseBias: 0.45, crowdSensitivity: 0.2,  slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.1, exploitWeight: 0.3, preflopCommitCap: 0.50, lowSprJamMax: 2.80, lowSprJamStrength: 0.30, committedJamStrength: 0.14, raiseShoveCommit: 0.42, callThresholdShift: -0.03, peelMargin: 0.10, peelRate: 0.22 },
+  trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.48, bluffRate: 0.03, raiseBias: 0.12, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.36, raiseShoveCommit: 0.78, callThresholdShift: -0.045, peelMargin: 0.12, peelRate: 0.34 },
+  bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5, preflopCommitCap: 0.30, lowSprJamMax: 2.20, lowSprJamStrength: 0.38, committedJamStrength: 0.20, raiseShoveCommit: 0.50, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.16 },
+  tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.25, lowSprJamMax: 2.10, lowSprJamStrength: 0.42, committedJamStrength: 0.22, raiseShoveCommit: 0.54, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.18 },
+  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.40, bluffRate: 0.05, raiseBias: 0.20, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25, lowSprJamMax: 3.00, lowSprJamStrength: 0.24, committedJamStrength: 0.10, raiseShoveCommit: 0.36, callThresholdShift: -0.01, peelMargin: 0.04, peelRate: 0.10 },
+  adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.25, lowSprJamMax: 1.90, lowSprJamStrength: 0.50, committedJamStrength: 0.28, raiseShoveCommit: 0.64, callThresholdShift: -0.025, peelMargin: 0.08, peelRate: 0.22 },
+  gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.38, raiseShoveCommit: 0.72, callThresholdShift: -0.03, peelMargin: 0.09, peelRate: 0.24 },
 };
 
 const TIMING_PROFILES: Record<SystemBotStyle, TimingProfile> = {
@@ -531,6 +534,9 @@ function blendStyleParams(base: StyleParams, mimic: StyleParams, weight: number)
     lowSprJamStrength: clamp01(mix(base.lowSprJamStrength, mimic.lowSprJamStrength)),
     committedJamStrength: clamp01(mix(base.committedJamStrength, mimic.committedJamStrength)),
     raiseShoveCommit: clamp01(mix(base.raiseShoveCommit, mimic.raiseShoveCommit)),
+    callThresholdShift: clampSigned(mix(base.callThresholdShift, mimic.callThresholdShift), 0.12),
+    peelMargin: clamp01(mix(base.peelMargin, mimic.peelMargin)),
+    peelRate: clamp01(mix(base.peelRate, mimic.peelRate)),
   };
 }
 
@@ -1500,7 +1506,7 @@ function chooseBuiltinAction(
   const oddsThreshold = potOdds * (1 - cfg.looseness * 0.5);
   const oddsWeight = 0.35 + cfg.looseness * 0.40;
   // v2: apply exploit callThresholdDelta (negative = easier to call, positive = tighter)
-  const callThreshold = baseThreshold * (1 - oddsWeight) + oddsThreshold * oddsWeight + callThresholdDelta;
+  const callThreshold = baseThreshold * (1 - oddsWeight) + oddsThreshold * oddsWeight + callThresholdDelta + cfg.callThresholdShift;
 
   // Raise threshold: aggressive styles raise thinner
   // Nit: 0.65  TAG: 0.55  LAG: 0.44  Station: 0.66
@@ -1588,6 +1594,25 @@ function chooseBuiltinAction(
   }
 
   if (strength < sizedCallThreshold) {
+    const peelWindow = cfg.peelMargin
+      * (lineContext.dryBoard ? 1.12 : lineContext.wetBoard ? 0.80 : 1.0)
+      * (lineContext.latePosition ? 1.08 : 1.0);
+    const peelGap = sizedCallThreshold - strength;
+    if (req.toCall < req.stack && peelWindow > 0 && peelGap > 0 && peelGap <= peelWindow) {
+      const proximity = 1 - peelGap / peelWindow;
+      const betPressure = req.toCall / Math.max(req.pot, 1);
+      const priceMult = betPressure <= 0.40 ? 1.15 : betPressure >= 0.85 ? 0.68 : 1.0;
+      const peelFreq = clamp01(
+        cfg.peelRate
+        * (0.30 + proximity * 0.90)
+        * priceMult
+        * (lineContext.dryBoard ? 1.08 : lineContext.wetBoard ? 0.85 : 1.0),
+      );
+      if (roll(peelFreq)) {
+        return { action: 'call' };
+      }
+    }
+
     // Below calling threshold — some styles still fire a light raise line.
     const bluffRaiseFreq = clamp01(
       cfg.bluffRate
@@ -1959,6 +1984,10 @@ function suitedLabel([a, b]: [Card, Card]): string {
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function clampSigned(value: number, maxAbs: number): number {
+  return Math.max(-maxAbs, Math.min(maxAbs, value));
 }
 
 function clampInt(value: number, min: number, max: number): number {

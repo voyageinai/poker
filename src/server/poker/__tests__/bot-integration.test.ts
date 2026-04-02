@@ -238,7 +238,7 @@ describe('Bot integration', () => {
   });
 
   it('human pressure increases aggression vs human players', async () => {
-    const trials = 30;
+    const trials = 80;
     let raiseCountWithHuman = 0;
     let raiseCountWithoutHuman = 0;
 

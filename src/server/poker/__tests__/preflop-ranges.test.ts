@@ -301,4 +301,52 @@ describe('preflopHandStrength', () => {
     }
     expect(maniacPlays).toBeGreaterThan(nitPlays);
   });
+
+  it('trapper can flat medium premiums facing a single raise', () => {
+    const result = getPreflopAction(['9h', '9d'], 'BTN', 'trapper', {
+      facing3Bet: false,
+      raisersAhead: 1,
+      stackBB: 60,
+      toCallBB: 2.5,
+      potOdds: 0.22,
+    });
+
+    expect(result.action).toBe('call');
+  });
+
+  it('gto defends suited wheel aces from the big blind', () => {
+    const result = getPreflopAction(['Ah', '5h'], 'BB', 'gto', {
+      facing3Bet: false,
+      raisersAhead: 1,
+      stackBB: 60,
+      toCallBB: 2,
+      potOdds: 0.25,
+    });
+
+    expect(result.action).toBe('call');
+  });
+
+  it('tag defends suited wheel aces from the big blind', () => {
+    const result = getPreflopAction(['Ah', '5h'], 'BB', 'tag', {
+      facing3Bet: false,
+      raisersAhead: 1,
+      stackBB: 60,
+      toCallBB: 2,
+      potOdds: 0.25,
+    });
+
+    expect(result.action).toBe('call');
+  });
+
+  it('trapper keeps suited broadways in the flatting bucket from the blinds', () => {
+    const result = getPreflopAction(['Qh', 'Jh'], 'BB', 'trapper', {
+      facing3Bet: false,
+      raisersAhead: 1,
+      stackBB: 60,
+      toCallBB: 3,
+      potOdds: 0.28,
+    });
+
+    expect(result.action).toBe('call');
+  });
 });

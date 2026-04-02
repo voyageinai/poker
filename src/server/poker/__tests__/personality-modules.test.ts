@@ -67,6 +67,68 @@ describe('playbook personality moves', () => {
     expect(result?.amount).toBeGreaterThanOrEqual(20);
   });
 
+  it('trapper can flat a preflop open to set the trap', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.05);
+
+    const result = matchPlaybook('trapper', {
+      ...baseContext,
+      street: 'preflop',
+      position: 'BTN',
+      facingAction: 'raise',
+      strength: 0.62,
+      currentBet: 60,
+      toCall: 40,
+      minRaise: 40,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.patternName).toBe('flat_preflop_trap');
+    expect(result?.action).toBe('call');
+  });
+
+  it('trapper can peel flop after flatting preflop', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.05);
+
+    const result = matchPlaybook('trapper', {
+      ...baseContext,
+      street: 'flop',
+      position: 'BTN',
+      facingAction: 'bet',
+      strength: 0.34,
+      currentBet: 40,
+      toCall: 40,
+      minRaise: 40,
+      priorMyActions: [{ street: 'preflop', action: 'call' }],
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.patternName).toBe('flop_peel_trap');
+    expect(result?.action).toBe('call');
+  });
+
+  it('trapper can keep the trap line alive on the turn', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.05);
+
+    const result = matchPlaybook('trapper', {
+      ...baseContext,
+      street: 'turn',
+      position: 'BTN',
+      facingAction: 'bet',
+      strength: 0.42,
+      currentBet: 80,
+      toCall: 80,
+      minRaise: 80,
+      priorMyActions: [
+        { street: 'preflop', action: 'call' },
+        { street: 'flop', action: 'call' },
+      ],
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.patternName).toBe('turn_peel_trap');
+    expect(result?.action).toBe('call');
+  });
+
   it('adaptive pressure_probe opens a low-strength info line in position', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.01);
 

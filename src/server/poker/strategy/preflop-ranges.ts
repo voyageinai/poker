@@ -21,6 +21,12 @@ export interface StyleRangeModifier {
   speculative: number;
 }
 
+interface DefenseProfile {
+  maxToCallBB: number;
+  callBonus: number;
+  flatWindow: number;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const RANK_ORDER = '23456789TJQKA';
@@ -48,6 +54,14 @@ const STYLE_MODIFIERS: Record<SystemBotStyle, StyleRangeModifier> = {
   shortstack: { rfiShift: -0.02, premiumBoost: 0.08,  suitedBonus: -0.02, speculative: -0.08 },
   adaptive:   { rfiShift:  0.04, premiumBoost: 0.02,  suitedBonus: 0.03, speculative: 0.05 },
   gto:        { rfiShift:  0.00, premiumBoost: 0.02,  suitedBonus: 0.02, speculative: 0.02 },
+};
+
+const DEFENSE_PROFILES: Partial<Record<SystemBotStyle, DefenseProfile>> = {
+  nit:      { maxToCallBB: 2.5, callBonus: 0.02, flatWindow: 0.02 },
+  tag:      { maxToCallBB: 4.5, callBonus: 0.05, flatWindow: 0.04 },
+  trapper:  { maxToCallBB: 6.5, callBonus: 0.10, flatWindow: 0.14 },
+  adaptive: { maxToCallBB: 5.0, callBonus: 0.05, flatWindow: 0.05 },
+  gto:      { maxToCallBB: 5.5, callBonus: 0.07, flatWindow: 0.06 },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -254,6 +268,17 @@ export function getPreflopAction(
 
   // Station style prefers calling over raising against aggression
   const isCallStation = style === 'station';
+  const defenseProfile = DEFENSE_PROFILES[style];
+  const canDefend = defenseProfile
+    && context.raisersAhead === 1
+    && !!context.toCallBB
+    && context.toCallBB > 0
+    && context.toCallBB <= defenseProfile.maxToCallBB;
+  const defensePositionMult = position === 'BB' ? 1.20
+    : position === 'SB' ? 1.10
+    : position === 'BTN' || position === 'CO' ? 1.05
+    : 0.90;
+  const defensePriceMult = context.toCallBB && context.toCallBB <= 2.5 ? 1.10 : 1.0;
 
   // Compute threshold: base RFI adjusted by style (floor of 0.06 prevents raising any-two)
   const rfiThreshold = Math.max(0.06, POSITION_RFI[position] - mod.rfiShift);
@@ -272,12 +297,18 @@ export function getPreflopAction(
     adaptive:   0.14,
     gto:        0.06,
   };
-  const callThreshold = rfiThreshold - callZoneWidth[style];
+  const defendBonus = canDefend
+    ? defenseProfile.callBonus * defensePositionMult * defensePriceMult
+    : 0;
+  const callThreshold = rfiThreshold - callZoneWidth[style] - defendBonus;
 
   // Decision
   if (strength >= rfiThreshold) {
     if (isCallStation && context.raisersAhead > 0) {
       return { action: 'call', frequency: 0.85 };
+    }
+    if (canDefend && strength < rfiThreshold + defenseProfile.flatWindow * defensePositionMult) {
+      return { action: 'call', frequency: Math.min(1, 0.60 + (strength - rfiThreshold + defenseProfile.flatWindow) * 2.5) };
     }
     return { action: 'raise', frequency: Math.min(1, 0.6 + (strength - rfiThreshold) * 2) };
   }

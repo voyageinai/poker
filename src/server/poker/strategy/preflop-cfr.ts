@@ -42,6 +42,12 @@ interface StyleDeviation {
   callShift: number;
 }
 
+interface DefenseProfile {
+  maxToCallBB: number;
+  foldToCall: number;
+  raiseToCall: number;
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const RANK_ORDER = '23456789TJQKA';
@@ -72,6 +78,14 @@ const STYLE_DEVIATIONS: Record<SystemBotStyle, StyleDeviation> = {
   tilter:     { rangeScale: 0.85, foldShift: +0.08,  raiseShift: 0,      callShift: -0.08 },
   shortstack: { rangeScale: 0.75, foldShift: +0.08,  raiseShift: +0.22,  callShift: -0.30 },
   adaptive:   { rangeScale: 1.10, foldShift: -0.08,  raiseShift: +0.10,  callShift: -0.02 },
+};
+
+const DEFENSE_PROFILES: Partial<Record<SystemBotStyle, DefenseProfile>> = {
+  nit:      { maxToCallBB: 2.5, foldToCall: 0.03, raiseToCall: 0.01 },
+  tag:      { maxToCallBB: 4.5, foldToCall: 0.08, raiseToCall: 0.04 },
+  trapper:  { maxToCallBB: 6.5, foldToCall: 0.14, raiseToCall: 0.12 },
+  adaptive: { maxToCallBB: 5.0, foldToCall: 0.08, raiseToCall: 0.04 },
+  gto:      { maxToCallBB: 5.5, foldToCall: 0.11, raiseToCall: 0.04 },
 };
 
 // ─── Load CFR tables (graceful fallback) ─────────────────────────────────────
@@ -247,6 +261,35 @@ function applyStyleDeviation(
   return freqs;
 }
 
+function applyDefenseBias(
+  freqs: ActionFrequencies,
+  style: SystemBotStyle,
+  position: Position,
+  actionSeq: ActionSequence,
+  context: {
+    toCallBB?: number;
+  },
+): ActionFrequencies {
+  const profile = DEFENSE_PROFILES[style];
+  if (!profile) return freqs;
+  if (actionSeq !== 'facing_raise') return freqs;
+  if (!context.toCallBB || context.toCallBB <= 0 || context.toCallBB > profile.maxToCallBB) return freqs;
+
+  const positionMult = position === 'BB' ? 1.20
+    : position === 'SB' ? 1.10
+    : position === 'BTN' || position === 'CO' ? 1.05
+    : 0.90;
+  const priceMult = context.toCallBB <= 2.5 ? 1.10 : 1.0;
+
+  const foldShift = Math.min(freqs.fold, profile.foldToCall * positionMult * priceMult);
+  const raiseShift = Math.min(freqs.raise, profile.raiseToCall * positionMult);
+  const call = freqs.call + foldShift + raiseShift;
+  const fold = freqs.fold - foldShift;
+  const raise = freqs.raise - raiseShift;
+
+  return { fold, call, raise };
+}
+
 /**
  * Select the highest-frequency action from the mixed strategy.
  *
@@ -304,7 +347,8 @@ export function getPreflopActionCFR(
   if (!gto) return null;
 
   // 3. Apply style deviation
-  const styled = applyStyleDeviation(gto, style);
+  let styled = applyStyleDeviation(gto, style);
+  styled = applyDefenseBias(styled, style, position, actionSeq, context);
 
   // 4. Select action from mixed strategy
   const result = selectAction(styled);

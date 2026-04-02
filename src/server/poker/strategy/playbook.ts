@@ -117,6 +117,17 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
       strengthGate: [0.52, 1.0],
     },
     {
+      name: 'flat_preflop_trap',
+      trigger: {
+        streets: ['preflop'],
+        positions: ['CO', 'BTN', 'SB', 'BB'],
+        facingAction: 'raise',
+      },
+      action: { type: 'call' },
+      frequency: 0.42,
+      strengthGate: [0.42, 0.92],
+    },
+    {
       name: 'delayed_cbet',
       trigger: {
         streets: ['turn'],
@@ -128,11 +139,36 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
       strengthGate: [0.38, 1.0],
     },
     {
+      name: 'flop_peel_trap',
+      trigger: {
+        streets: ['flop'],
+        facingAction: 'bet',
+        priorMyActions: [{ street: 'preflop', action: 'call' }],
+      },
+      action: { type: 'call' },
+      frequency: 0.50,
+      strengthGate: [0.18, 0.80],
+    },
+    {
+      name: 'turn_peel_trap',
+      trigger: {
+        streets: ['turn'],
+        facingAction: 'bet',
+        priorMyActions: [
+          { street: 'preflop', action: 'call' },
+          { street: 'flop', action: 'call' },
+        ],
+      },
+      action: { type: 'call' },
+      frequency: 0.34,
+      strengthGate: [0.28, 0.56],
+    },
+    {
       name: 'min_raise_trap',
       trigger: { streets: ['flop', 'turn', 'river'], facingAction: 'bet' },
       action: { type: 'raise', sizing: { mode: 'minraise' } },
-      frequency: 0.58,
-      strengthGate: [0.68, 1.0],
+      frequency: 0.62,
+      strengthGate: [0.62, 1.0],
     },
     {
       name: 'check_call_then_raise',
@@ -142,8 +178,8 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
         priorMyActions: [{ street: 'flop', action: 'call' }],
       },
       action: { type: 'raise', sizing: { mode: 'prev_bet_multiple', multiple: 2.5 } },
-      frequency: 0.38,
-      strengthGate: [0.58, 1.0],
+      frequency: 0.42,
+      strengthGate: [0.50, 1.0],
     },
   ],
 
