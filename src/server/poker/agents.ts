@@ -28,6 +28,9 @@ import { checkUnconditionalBluff } from './strategy/unconditional-bluff';
 
 const BOT_ACTION_TIMEOUT_MS = parseInt(process.env.BOT_ACTION_TIMEOUT_MS ?? '5000', 10);
 const HUMAN_ACTION_TIMEOUT_MS = parseInt(process.env.HUMAN_ACTION_TIMEOUT_MS ?? '30000', 10);
+const ENABLE_BUILTIN_BOT_TIMING =
+  process.env.BOT_PERSONALITY_TIMING === '1'
+  || (process.env.BOT_PERSONALITY_TIMING !== '0' && process.env.NODE_ENV !== 'test');
 
 export interface ActionRequest {
   street: 'preflop' | 'flop' | 'turn' | 'river';
@@ -280,6 +283,31 @@ interface StyleParams {
   preflopCommitCap: number;
 }
 
+interface AdaptivePersonalityPlan {
+  mimicStyle: SystemBotStyle;
+  reason: string;
+}
+
+interface HeuristicLineContext {
+  checkedThisStreet: boolean;
+  dryBoard: boolean;
+  wetBoard: boolean;
+  latePosition: boolean;
+}
+
+type RaiseIntent = 'value' | 'bluff' | 'pressure';
+
+interface TimingProfile {
+  minMs: number;
+  maxMs: number;
+  facingBetBonus: number;
+  riverBonus: number;
+  foldMult: number;
+  allinMult: number;
+  raiseMult: number;
+  freeActionMult: number;
+}
+
 const STYLE_CONFIG: Record<SystemBotStyle, StyleParams> = {
   nit:        { label: '司马懿', aggression: 0.28, looseness: 0.18, bluffRate: 0.01, raiseBias: 0.08, crowdSensitivity: 1.0,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3, preflopCommitCap: 0.25 },
   tag:        { label: '赵云',   aggression: 0.52, looseness: 0.42, bluffRate: 0.04, raiseBias: 0.18, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.05, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7, preflopCommitCap: 0.25 },
@@ -292,6 +320,20 @@ const STYLE_CONFIG: Record<SystemBotStyle, StyleParams> = {
   shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.40, bluffRate: 0.05, raiseBias: 0.20, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25 },
   adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.25 },
   gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.25 },
+};
+
+const TIMING_PROFILES: Record<SystemBotStyle, TimingProfile> = {
+  nit:        { minMs: 420, maxMs: 980, facingBetBonus: 180, riverBonus: 140, foldMult: 1.10, allinMult: 1.20, raiseMult: 1.05, freeActionMult: 0.95 },
+  tag:        { minMs: 240, maxMs: 520, facingBetBonus: 110, riverBonus: 90, foldMult: 1.00, allinMult: 1.10, raiseMult: 1.00, freeActionMult: 0.90 },
+  lag:        { minMs: 140, maxMs: 360, facingBetBonus: 70, riverBonus: 60, foldMult: 0.95, allinMult: 0.90, raiseMult: 0.90, freeActionMult: 0.85 },
+  station:    { minMs: 260, maxMs: 560, facingBetBonus: 80, riverBonus: 100, foldMult: 0.90, allinMult: 1.00, raiseMult: 0.95, freeActionMult: 0.88 },
+  maniac:     { minMs: 60, maxMs: 180, facingBetBonus: 25, riverBonus: 20, foldMult: 0.80, allinMult: 0.60, raiseMult: 0.75, freeActionMult: 0.80 },
+  trapper:    { minMs: 320, maxMs: 760, facingBetBonus: 160, riverBonus: 120, foldMult: 1.05, allinMult: 1.10, raiseMult: 1.15, freeActionMult: 0.95 },
+  bully:      { minMs: 120, maxMs: 300, facingBetBonus: 60, riverBonus: 60, foldMult: 0.90, allinMult: 0.85, raiseMult: 0.85, freeActionMult: 0.85 },
+  tilter:     { minMs: 150, maxMs: 360, facingBetBonus: 70, riverBonus: 50, foldMult: 0.85, allinMult: 0.70, raiseMult: 0.85, freeActionMult: 0.82 },
+  shortstack: { minMs: 80, maxMs: 220, facingBetBonus: 40, riverBonus: 30, foldMult: 0.85, allinMult: 0.75, raiseMult: 0.80, freeActionMult: 0.82 },
+  adaptive:   { minMs: 220, maxMs: 520, facingBetBonus: 110, riverBonus: 100, foldMult: 1.00, allinMult: 1.00, raiseMult: 1.00, freeActionMult: 0.90 },
+  gto:        { minMs: 280, maxMs: 620, facingBetBonus: 130, riverBonus: 120, foldMult: 1.00, allinMult: 1.08, raiseMult: 1.05, freeActionMult: 0.92 },
 };
 
 // ─── Opponent stats for adaptive bot ──────────────────────────────────────────
@@ -463,6 +505,94 @@ export function calcHumanPressure(skill: HumanSkillLevel, style: SystemBotStyle)
   return Math.min(pressure, maxPressure);
 }
 
+function blendStyleParams(base: StyleParams, mimic: StyleParams, weight: number): StyleParams {
+  const w = clamp01(weight);
+  const mix = (a: number, b: number) => a * (1 - w) + b * w;
+
+  return {
+    label: base.label,
+    aggression: clamp01(mix(base.aggression, mimic.aggression)),
+    looseness: clamp01(mix(base.looseness, mimic.looseness)),
+    bluffRate: clamp01(mix(base.bluffRate, mimic.bluffRate)),
+    raiseBias: clamp01(mix(base.raiseBias, mimic.raiseBias)),
+    crowdSensitivity: clamp01(mix(base.crowdSensitivity, mimic.crowdSensitivity)),
+    slowplayRate: clamp01(mix(base.slowplayRate, mimic.slowplayRate)),
+    checkRaiseRate: clamp01(mix(base.checkRaiseRate, mimic.checkRaiseRate)),
+    positionSensitivity: clamp01(mix(base.positionSensitivity, mimic.positionSensitivity)),
+    sizingSensitivity: clamp01(mix(base.sizingSensitivity, mimic.sizingSensitivity)),
+    patternSensitivity: clamp01(mix(base.patternSensitivity, mimic.patternSensitivity)),
+    exploitWeight: clamp01(mix(base.exploitWeight, mimic.exploitWeight)),
+    preflopCommitCap: clamp01(mix(base.preflopCommitCap, mimic.preflopCommitCap)),
+  };
+}
+
+export function resolveAdaptivePersonality(
+  profile: OpponentProfile | null | undefined,
+  stackRatio: number,
+): AdaptivePersonalityPlan {
+  if (!profile || profile.hands < 8) {
+    return { mimicStyle: 'tag', reason: '样本不足, 先用标准线试探.' };
+  }
+
+  if (profile.af > 2.5) {
+    return { mimicStyle: 'trapper', reason: '对手过于好斗, 借王熙凤的伏击线反制.' };
+  }
+
+  if (profile.vpipRate < 0.25 || profile.foldToCbetRate > 0.60 || profile.wtsdRate < 0.20) {
+    if (profile.foldToCbetRate > 0.70 || profile.vpipRate < 0.18) {
+      return { mimicStyle: 'maniac', reason: '对手太紧, 借张飞的疯压线强行偷池.' };
+    }
+    return { mimicStyle: 'lag', reason: '对手偏紧, 借孙悟空的高压位置线持续施压.' };
+  }
+
+  if (profile.vpipRate > 0.55 && profile.af < 0.8) {
+    if (stackRatio > 1.25) {
+      return { mimicStyle: 'bully', reason: '对手跟注过宽且我有码差, 借鲁智深的碾压线榨值.' };
+    }
+    return { mimicStyle: 'tag', reason: '对手愿意跟到底, 收敛诈唬改打薄价值.' };
+  }
+
+  if (profile.af < 0.8) {
+    return { mimicStyle: 'bully', reason: '对手被动退让, 借鲁智深的压力线逼弃.' };
+  }
+
+  return { mimicStyle: 'tag', reason: '暂无明显破绽, 先用稳健平衡线观察.' };
+}
+
+export function computePersonalityThinkTime(
+  style: SystemBotStyle,
+  action: PokerAction,
+  req: ActionRequest,
+  rollValue: number = Math.random(),
+): number {
+  const profile = TIMING_PROFILES[style];
+  const base = profile.minMs + (profile.maxMs - profile.minMs) * clamp01(rollValue);
+  let thinkMs = base;
+
+  if (req.toCall > 0) thinkMs += profile.facingBetBonus;
+  if (req.street === 'river') thinkMs += profile.riverBonus;
+
+  if (req.toCall === 0 && (action.action === 'check' || action.action === 'raise')) {
+    thinkMs *= profile.freeActionMult;
+  }
+
+  switch (action.action) {
+    case 'fold':
+      thinkMs *= profile.foldMult;
+      break;
+    case 'raise':
+      thinkMs *= profile.raiseMult;
+      break;
+    case 'allin':
+      thinkMs *= profile.allinMult;
+      break;
+    default:
+      break;
+  }
+
+  return clampInt(Math.round(thinkMs), 0, Math.max(0, BOT_ACTION_TIMEOUT_MS - 150));
+}
+
 export class BuiltinBotAgent implements PlayerAgent {
   readonly timeoutMs = BOT_ACTION_TIMEOUT_MS;
   private holeCards: [Card, Card] | null = null;
@@ -628,22 +758,37 @@ export class BuiltinBotAgent implements PlayerAgent {
 
   requestAction(req: ActionRequest): Promise<PokerAction & { debug?: BotDebugInfo }> {
     if (!this.holeCards) {
-      return Promise.resolve({
+      return this.finalizeBuiltinDecision({
         action: req.toCall > 0 ? 'fold' : 'check',
         debug: { reasoning: `${this.definition.name}: 无手牌信息，安全弃牌.` },
-      });
+      }, this.definition.style, req);
     }
 
     const style = this.definition.style;
     let cfg = { ...STYLE_CONFIG[style] };
     let extraReasoning = '';
+    let personalityStyle: SystemBotStyle = style;
+    const avgOppStack = this.players
+      .filter(p => p.seat !== this.mySeat)
+      .reduce((s, p) => s + p.stack, 0) / Math.max(1, this.players.length - 1);
+    const stackRatio = req.stack / Math.max(avgOppStack, 1);
+
+    // ─── Adaptive (曹操): mimic the weakness we currently observe ────────────
+    if (style === 'adaptive') {
+      const lastActor = req.history.length > 0 ? req.history[req.history.length - 1] : null;
+      const targetPid = lastActor ? this.seatToPlayerId.get(lastActor.seat) : undefined;
+      const targetProfile = targetPid ? this.opponentTracker.getProfile(targetPid) : undefined;
+      const profile = targetProfile && targetProfile.hands >= 8
+        ? targetProfile
+        : this.getAverageOpponentProfile();
+      const plan = resolveAdaptivePersonality(profile, stackRatio);
+      personalityStyle = plan.mimicStyle;
+      cfg = blendStyleParams(cfg, STYLE_CONFIG[personalityStyle], 0.70);
+      extraReasoning = ` 变色龙→${STYLE_CONFIG[personalityStyle].label}. ${plan.reason}`;
+    }
 
     // ─── Bully (鲁智深): boost aggression vs short stacks ────────────────
     if (style === 'bully') {
-      const avgOppStack = this.players
-        .filter(p => p.seat !== this.mySeat)
-        .reduce((s, p) => s + p.stack, 0) / Math.max(1, this.players.length - 1);
-      const stackRatio = req.stack / Math.max(avgOppStack, 1);
       if (stackRatio > 1.5) {
         const boost = Math.min((stackRatio - 1) * 0.2, 0.3);
         cfg.aggression = clamp01(cfg.aggression + boost);
@@ -668,13 +813,13 @@ export class BuiltinBotAgent implements PlayerAgent {
       const bbCount = req.stack / this.bigBlind;
       if (bbCount <= 15 && req.street === 'preflop') {
         const action = choosePushFold(this.holeCards, bbCount, req, this.players.length);
-        return Promise.resolve({
+        return this.finalizeBuiltinDecision({
           ...action,
           debug: {
             equity: preflopStrength(this.holeCards),
             reasoning: `${this.definition.name}: ${bbCount.toFixed(0)}BB 短码模式, ${action.action === 'allin' ? '全下!' : '弃牌等待.'}`,
           },
-        });
+        }, 'shortstack', req);
       }
     }
 
@@ -682,12 +827,8 @@ export class BuiltinBotAgent implements PlayerAgent {
     {
       const opponents = Math.max(1, this.players.length - 1);
       const earlyStrength = req.street === 'preflop'
-        ? preflopHandStrengthV2(this.holeCards, this.myPosition, style)
+        ? preflopHandStrengthV2(this.holeCards, this.myPosition, personalityStyle)
         : postflopStrengthMCV2(this.holeCards, req.board, opponents);
-
-      const avgOppStack = this.players
-        .filter(p => p.seat !== this.mySeat)
-        .reduce((s, p) => s + p.stack, 0) / Math.max(1, this.players.length - 1);
 
       const facingAction: 'none' | 'bet' | 'raise' = req.toCall <= 0 ? 'none'
         : (req.history.length > 0 && req.history[req.history.length - 1].action === 'raise') ? 'raise' : 'bet';
@@ -712,24 +853,24 @@ export class BuiltinBotAgent implements PlayerAgent {
       };
 
       // [1] Playbook signature moves
-      const pbResult = matchPlaybook(style, pbCtx);
+      const pbResult = matchPlaybook(personalityStyle, pbCtx);
       if (pbResult) {
         const action: PokerAction = pbResult.amount > 0
           ? { action: pbResult.action as 'raise', amount: pbResult.amount }
           : { action: pbResult.action as 'fold' | 'check' | 'call' | 'allin' };
-        return Promise.resolve({
+        return this.finalizeBuiltinDecision({
           ...action,
           debug: {
             equity: earlyStrength,
             reasoning: `${this.definition.name}: [${pbResult.patternName}] 签名招式!${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
           },
-        });
+        }, personalityStyle, req);
       }
 
       // [2] Unconditional bluff engine (postflop only)
       if (req.street !== 'preflop') {
         const bluffResult = checkUnconditionalBluff(
-          style,
+          personalityStyle,
           this.myPosition as 'UTG' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB',
           req.street,
           pbCtx.boardTexture,
@@ -744,13 +885,13 @@ export class BuiltinBotAgent implements PlayerAgent {
           const action: PokerAction = bluffResult.amount >= req.stack
             ? { action: 'allin' }
             : { action: bluffResult.action, amount: bluffResult.amount };
-          return Promise.resolve({
+          return this.finalizeBuiltinDecision({
             ...action,
             debug: {
               equity: earlyStrength,
               reasoning: `${this.definition.name}: [${bluffResult.source}] ${this.bluffStreetCount > 1 ? `连续施压第${this.bluffStreetCount}街` : '位置 bluff'} @ ${this.myPosition}.${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
             },
-          });
+          }, personalityStyle, req);
         }
         // If bluff engine didn't fire, reset bluff line for this street
         if (this.currentBluffLine && req.toCall <= 0) {
@@ -808,16 +949,12 @@ export class BuiltinBotAgent implements PlayerAgent {
     // Dynamic style shifting based on bot state:
     // 林冲 (tilter): tilted → plays like 张飞 (maniac)
     // 鲁智深 (bully): chip advantage → plays like 孙悟空 (lag)
-    let effectiveStyle: SystemBotStyle = style;
+    let effectiveStyle: SystemBotStyle = personalityStyle;
     if (style === 'tilter' && this.tiltLevel > 0.3) {
       effectiveStyle = this.tiltLevel > 0.7 ? 'maniac' : 'lag';
       extraReasoning += this.tiltLevel > 0.7 ? ' 风雪山神庙!' : ' 渐失冷静.';
     }
     if (style === 'bully') {
-      const avgOppStack = this.players
-        .filter(p => p.seat !== this.mySeat)
-        .reduce((s, p) => s + p.stack, 0) / Math.max(1, this.players.length - 1);
-      const stackRatio = req.stack / Math.max(avgOppStack, 1);
       if (stackRatio > 1.5) {
         effectiveStyle = 'lag'; // 碾压模式: 宽范围高压
         extraReasoning += ` 筹码碾压(${stackRatio.toFixed(1)}x)!`;
@@ -845,14 +982,14 @@ export class BuiltinBotAgent implements PlayerAgent {
         const action: PokerAction = solverResult.amount > 0
           ? { action: solverResult.action as 'raise', amount: solverResult.amount }
           : { action: solverResult.action as 'fold' | 'check' | 'call' | 'allin' };
-        return Promise.resolve({
+        return this.finalizeBuiltinDecision({
           ...action,
           debug: {
             equity: solverResult.debug?.strength ?? 0,
             potOdds: req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0,
             reasoning: `${this.definition.name}: DCFR solver [${solverResult.debug?.source}] ${solverResult.debug?.iterations ?? 0} iterations.${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
           },
-        });
+        }, effectiveStyle, req);
       }
     }
 
@@ -875,7 +1012,7 @@ export class BuiltinBotAgent implements PlayerAgent {
       };
       const decision = chooseBalancedAction(gtoStrength, balancedReq, texture, this.players.length);
       const { frequencies } = decision;
-      return Promise.resolve({
+      return this.finalizeBuiltinDecision({
         action: decision.action,
         ...(decision.amount > 0 ? { amount: decision.amount } : {}),
         debug: {
@@ -886,7 +1023,7 @@ export class BuiltinBotAgent implements PlayerAgent {
           raiseFreq: frequencies.raise,
           reasoning: `${this.definition.name}: 均衡策略 [F${Math.round(frequencies.fold * 100)}% C${Math.round(frequencies.call * 100)}% R${Math.round(frequencies.raise * 100)}%] ${decision.reasoning}. ${describeHolding(req.street, this.holeCards, req.board)}.`,
         },
-      });
+      }, 'gto', req);
     }
 
     // ─── v2 Preflop: use getPreflopAction for position-aware decisions ────
@@ -949,16 +1086,16 @@ export class BuiltinBotAgent implements PlayerAgent {
         } else if (roll < pFold + pCall) {
           preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
         } else {
-          const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
-          preflopAction = chooseRaiseAction(req, raiseStrength, cfg, style);
+          const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, effectiveStyle);
+          preflopAction = chooseRaiseAction(req, raiseStrength, cfg, effectiveStyle);
         }
       } else {
         // Heuristic fallback: binary randomization on dominant action
         const boostedFreq = Math.min(1, preflopDecision.frequency + humanPressureBoost);
         if (preflopDecision.action === 'raise') {
           if (roll < boostedFreq) {
-            const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
-            preflopAction = chooseRaiseAction(req, raiseStrength, cfg, style);
+            const raiseStrength = preflopHandStrengthV2(this.holeCards, this.myPosition, effectiveStyle);
+            preflopAction = chooseRaiseAction(req, raiseStrength, cfg, effectiveStyle);
           } else {
             preflopAction = req.toCall > 0 ? { action: 'call' } : { action: 'check' };
           }
@@ -973,15 +1110,15 @@ export class BuiltinBotAgent implements PlayerAgent {
         }
       }
 
-      const preflopStrengthVal = preflopHandStrengthV2(this.holeCards, this.myPosition, style);
-      return Promise.resolve({
+      const preflopStrengthVal = preflopHandStrengthV2(this.holeCards, this.myPosition, effectiveStyle);
+      return this.finalizeBuiltinDecision({
         ...preflopAction,
         debug: {
           equity: preflopStrengthVal,
           potOdds,
           reasoning: `${this.definition.name}: preflop ${this.myPosition} ${preflopDecision.action}(${Math.round(preflopDecision.frequency * 100)}%). ${describeHolding(req.street, this.holeCards, req.board)}.${extraReasoning}`,
         },
-      });
+      }, effectiveStyle, req);
     }
 
     // ─── Postflop path (standard engine) ─────────────────────────────────
@@ -1043,9 +1180,23 @@ export class BuiltinBotAgent implements PlayerAgent {
     }
 
     const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
-    const action = chooseBuiltinAction(style, adjustedStrength, potOdds, req, cfg, texture, callThresholdDelta);
+    const action = chooseBuiltinAction(
+      effectiveStyle,
+      adjustedStrength,
+      potOdds,
+      req,
+      cfg,
+      texture,
+      callThresholdDelta,
+      {
+        checkedThisStreet: this.myActionsThisHand.some(a => a.street === req.street && a.action === 'check'),
+        dryBoard: texture?.wetness !== undefined ? texture.wetness < 0.25 : false,
+        wetBoard: texture?.wetness !== undefined ? texture.wetness > 0.55 : false,
+        latePosition: isLatePosition,
+      },
+    );
 
-    return Promise.resolve({
+    return this.finalizeBuiltinDecision({
       ...action,
       debug: {
         equity: adjustedStrength,
@@ -1055,6 +1206,26 @@ export class BuiltinBotAgent implements PlayerAgent {
         raiseFreq: clamp01(cfg.raiseBias + adjustedStrength * cfg.aggression),
         reasoning: `${this.definition.name}: ${describeHolding(req.street, this.holeCards, req.board)}.${extraReasoning}`,
       },
+    }, effectiveStyle, req);
+  }
+
+  private finalizeBuiltinDecision<T extends PokerAction & { debug?: BotDebugInfo }>(
+    result: T,
+    style: SystemBotStyle,
+    req: ActionRequest,
+  ): Promise<T> {
+    const thinkMs = computePersonalityThinkTime(style, result, req);
+
+    if (result.debug) {
+      result.debug.thinkMs = thinkMs;
+    }
+
+    if (!ENABLE_BUILTIN_BOT_TIMING || thinkMs <= 0) {
+      return Promise.resolve(result);
+    }
+
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(result), thinkMs);
     });
   }
 
@@ -1200,6 +1371,12 @@ function chooseBuiltinAction(
   cfg?: StyleParams,
   texture?: BoardTexture | null,
   callThresholdDelta: number = 0,
+  lineContext: HeuristicLineContext = {
+    checkedThisStreet: false,
+    dryBoard: false,
+    wetBoard: false,
+    latePosition: false,
+  },
 ): PokerAction {
   if (!cfg) cfg = STYLE_CONFIG[style];
 
@@ -1260,8 +1437,6 @@ function chooseBuiltinAction(
   const maxRaiseTotal = req.currentBet + req.stack - req.toCall;
   const canRaise = req.stack > req.toCall && minRaiseTotal <= maxRaiseTotal;
 
-  // Dynamic floors: aggressive styles can bluff/raise with weaker hands
-  const bluffFloor = 0.32 - cfg.looseness * 0.22;
   const raiseBiasFloor = 0.42 - cfg.looseness * 0.15;
   // Thin value bet floor: allows medium-strength hands to bet for value
   const valueBetFloor = sizedRaiseThreshold - 0.12 - cfg.aggression * 0.08;
@@ -1272,12 +1447,18 @@ function chooseBuiltinAction(
     if (spr < 3 && strength > 0.40) {
       return { action: 'allin' };
     }
-    // Trapper slowplay: with strong hands, check to induce a bet (then check-raise later)
-    if (strength > 0.75 && roll(cfg.slowplayRate)) {
+    // Slowplay is no longer nuts-only. Trappy styles can check medium-strong
+    // hands on calmer boards to preserve a later raise line.
+    const slowplayFreq = clamp01(
+      cfg.slowplayRate
+      * (0.20 + Math.max(0, strength - valueBetFloor + 0.20) * 1.10)
+      * (lineContext.dryBoard ? 1.15 : 0.85),
+    );
+    if (strength > Math.max(0.42, valueBetFloor) && roll(slowplayFreq)) {
       return { action: 'check' };
     }
     if (canRaise && strength > sizedRaiseThreshold) {
-      return chooseRaiseAction(req, strength, cfg, style, texture);
+      return chooseRaiseAction(req, strength, cfg, style, texture, 'value');
     }
     // Thin value bet: medium-strength hands bet smaller for value
     if (canRaise && strength > valueBetFloor && strength <= sizedRaiseThreshold) {
@@ -1288,30 +1469,57 @@ function chooseBuiltinAction(
       );
       return raiseTotal >= maxRaiseTotal ? { action: 'allin' } : { action: 'raise', amount: raiseTotal };
     }
-    // Bluff bet: aggressive styles can bet with air
-    if (canRaise && strength > bluffFloor && roll(cfg.bluffRate)) {
-      return chooseRaiseAction(req, strength, cfg, style, texture);
+    // Bluff bet: garbage can now bluff too. Position/board texture change the
+    // frequency, instead of a hard hand-strength floor locking trash out.
+    const bluffBetFreq = clamp01(
+      cfg.bluffRate
+      * (0.35 + (1 - strength) * 0.85)
+      * (lineContext.latePosition ? 1.20 : 0.95)
+      * (lineContext.dryBoard ? 1.15 : lineContext.wetBoard ? 0.85 : 1.0),
+    );
+    if (canRaise && strength < valueBetFloor && roll(bluffBetFreq)) {
+      return chooseRaiseAction(req, strength, cfg, style, texture, 'bluff');
     }
     return { action: 'check' };
   }
 
   // Facing a bet: fold / call / raise
-  // Check-raise opportunity: if we checked and now face a bet with a strong hand
-  if (canRaise && strength > 0.65 && roll(cfg.checkRaiseRate)) {
-    return chooseRaiseAction(req, strength, cfg, style, texture);
+  // Check-raise now has both value and bluff branches. Trappy styles can
+  // spring with medium strength; aggressive styles can bluff-raise after checking.
+  if (canRaise && lineContext.checkedThisStreet) {
+    const valueCheckRaiseFreq = clamp01(
+      cfg.checkRaiseRate * (0.25 + Math.max(0, strength - valueBetFloor + 0.10) * 1.20),
+    );
+    if (strength >= Math.max(valueBetFloor, sizedCallThreshold) && roll(valueCheckRaiseFreq)) {
+      return chooseRaiseAction(req, strength, cfg, style, texture, 'value');
+    }
+
+    const bluffCheckRaiseFreq = clamp01(
+      cfg.bluffRate
+      * (0.22 + (1 - strength) * 0.45)
+      * (lineContext.dryBoard ? 1.20 : lineContext.wetBoard ? 0.80 : 1.0),
+    );
+    if (strength < sizedCallThreshold && roll(bluffCheckRaiseFreq)) {
+      return chooseRaiseAction(req, strength, cfg, style, texture, 'bluff');
+    }
   }
 
   if (strength < sizedCallThreshold) {
-    // Below calling threshold — sometimes bluff-raise
-    if (canRaise && strength > bluffFloor + 0.10 && roll(cfg.bluffRate)) {
-      return chooseRaiseAction(req, strength, cfg, style, texture);
+    // Below calling threshold — some styles still fire a light raise line.
+    const bluffRaiseFreq = clamp01(
+      cfg.bluffRate
+      * (0.18 + (1 - strength) * 0.40)
+      * (lineContext.dryBoard ? 1.12 : lineContext.wetBoard ? 0.82 : 1.0),
+    );
+    if (canRaise && roll(bluffRaiseFreq)) {
+      return chooseRaiseAction(req, strength, cfg, style, texture, 'bluff');
     }
     return { action: 'fold' };
   }
 
   // Above calling threshold — consider raising
   if (canRaise && (strength > sizedRaiseThreshold || (strength > raiseBiasFloor && roll(cfg.raiseBias)))) {
-    return chooseRaiseAction(req, strength, cfg, style, texture);
+    return chooseRaiseAction(req, strength, cfg, style, texture, 'value');
   }
 
   // All-in call when pot-committed
@@ -1328,6 +1536,7 @@ function chooseRaiseAction(
   cfg: StyleParams,
   style: SystemBotStyle = 'tag',
   texture?: BoardTexture | null,
+  intent: RaiseIntent = strength < 0.35 ? 'bluff' : 'value',
 ): PokerAction {
   if (req.stack <= req.toCall) return { action: 'allin' };
 
@@ -1343,7 +1552,7 @@ function chooseRaiseAction(
 
   // v2: use geometric bet sizing module with texture awareness
   const streetsLeft = req.street === 'preflop' ? 4 : req.street === 'flop' ? 3 : req.street === 'turn' ? 2 : 1;
-  const isBluff = strength < 0.35;
+  const isBluff = intent !== 'value';
   const legalConstraints: LegalConstraints = {
     minRaise: effectiveMinRaise,
     currentBet: req.currentBet,
@@ -1683,3 +1892,4 @@ export function createBotAgent(
 }
 
 export const STYLE_CONFIG_FOR_TEST = STYLE_CONFIG;
+export const chooseBuiltinActionForTest = chooseBuiltinAction;

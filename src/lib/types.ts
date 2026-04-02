@@ -67,6 +67,8 @@ export interface PlayerState {
 export interface BotDebugInfo {
   /** win equity 0–1 */
   equity?: number;
+  /** simulated think time in ms for builtin personalities */
+  thinkMs?: number;
   /** expected value in chips */
   ev?: number;
   /** pot odds 0–1 */
