@@ -52,12 +52,12 @@ const BLUFF_CONFIG: Record<SystemBotStyle, BluffConfig | null> = {
     sizingFraction: 1.00,
   },
   tag: {
-    positionRate: { UTG: 0, MP: 0.02, CO: 0.05, BTN: 0.08, SB: 0.03, BB: 0 },
-    dryBoardBonus: 0.03,
+    positionRate: { UTG: 0, MP: 0.03, CO: 0.08, BTN: 0.12, SB: 0.05, BB: 0 },
+    dryBoardBonus: 0.05,
     wetBoardPenalty: 0.04,
-    secondBarrelRate: 0.25,
-    thirdBarrelRate: 0.10,
-    sizingFraction: 0.55,
+    secondBarrelRate: 0.32,
+    thirdBarrelRate: 0.12,
+    sizingFraction: 0.58,
   },
   nit: {
     positionRate: { UTG: 0, MP: 0, CO: 0, BTN: 0.02, SB: 0, BB: 0 },

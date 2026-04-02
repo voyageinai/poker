@@ -284,11 +284,11 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
       trigger: {
         streets: ['flop'],
         facingAction: 'none',
-        stackDepthBB: [0, 12],
+        stackDepthBB: [0, 16],
         priorMyActions: [{ street: 'preflop', action: 'call' }],
       },
       action: { type: 'allin' },
-      frequency: 0.20,
+      frequency: 0.28,
       strengthGate: [0.25, 1.0],
     },
     {
@@ -297,11 +297,11 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
         streets: ['preflop'],
         positions: ['BTN', 'CO', 'SB'],
         facingAction: 'raise',
-        stackDepthBB: [0, 15],
+        stackDepthBB: [0, 18],
       },
       action: { type: 'allin' },
-      frequency: 0.25,
-      strengthGate: [0.35, 1.0],
+      frequency: 0.32,
+      strengthGate: [0.30, 1.0],
     },
   ],
 

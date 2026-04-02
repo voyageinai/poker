@@ -531,10 +531,16 @@ export function resolveAdaptivePersonality(
   stackRatio: number,
 ): AdaptivePersonalityPlan {
   if (!profile || profile.hands < 8) {
-    return { mimicStyle: 'tag', reason: '样本不足, 先用标准线试探.' };
+    if (stackRatio > 1.2) {
+      return { mimicStyle: 'bully', reason: '样本不足但我有码差, 先用压迫线试探谁会退让.' };
+    }
+    return { mimicStyle: 'lag', reason: '样本不足, 先用高压探路线收集反应.' };
   }
 
   if (profile.af > 2.5) {
+    if (profile.vpipRate < 0.28 && profile.foldToCbetRate > 0.45) {
+      return { mimicStyle: 'lag', reason: '对手紧但主动, 不跟他玩埋伏, 直接用高压偷走弃牌率.' };
+    }
     return { mimicStyle: 'trapper', reason: '对手过于好斗, 借王熙凤的伏击线反制.' };
   }
 
@@ -556,7 +562,15 @@ export function resolveAdaptivePersonality(
     return { mimicStyle: 'bully', reason: '对手被动退让, 借鲁智深的压力线逼弃.' };
   }
 
-  return { mimicStyle: 'tag', reason: '暂无明显破绽, 先用稳健平衡线观察.' };
+  if (profile.pfrRate < 0.16 && profile.wtsdRate < 0.24) {
+    return { mimicStyle: 'lag', reason: '对手主动性不足又不肯摊牌, 借孙悟空的偷压线持续拿小池.' };
+  }
+
+  if (stackRatio > 1.15) {
+    return { mimicStyle: 'bully', reason: '暂无明确漏洞, 但我有码差, 先用碾压线制造弃牌.' };
+  }
+
+  return { mimicStyle: 'lag', reason: '暂无明显破绽, 先用高频施压线逼出更多信息.' };
 }
 
 export function computePersonalityThinkTime(
@@ -685,9 +699,10 @@ export class BuiltinBotAgent implements PlayerAgent {
         this.currentStreet = msg.name as 'preflop' | 'flop' | 'turn' | 'river';
         // v2: track players who saw the flop (for WTSD opportunity)
         if (this.currentStreet === 'flop') {
+          const activeOpponents = new Set(this.getActiveOpponentSeats());
           this.flopPlayerIds = [];
           for (const [seat, pid] of this.seatToPlayerId) {
-            if (seat !== this.mySeat) this.flopPlayerIds.push(pid);
+            if (activeOpponents.has(seat)) this.flopPlayerIds.push(pid);
           }
           this.opponentTracker.recordSawFlop(this.flopPlayerIds);
         }
@@ -811,7 +826,7 @@ export class BuiltinBotAgent implements PlayerAgent {
     // ─── Shortstack (燕青): push/fold when ≤15BB ─────────────────────────
     if (style === 'shortstack') {
       const bbCount = req.stack / this.bigBlind;
-      if (bbCount <= 15 && req.street === 'preflop') {
+      if (bbCount <= 18 && req.street === 'preflop') {
         const action = choosePushFold(this.holeCards, bbCount, req, this.players.length);
         return this.finalizeBuiltinDecision({
           ...action,
@@ -825,7 +840,9 @@ export class BuiltinBotAgent implements PlayerAgent {
 
     // ─── Playbook: signature moves (checked before solver/heuristic) ────────
     {
-      const opponents = Math.max(1, this.players.length - 1);
+      const opponents = req.street === 'preflop'
+        ? Math.max(1, this.players.length - 1)
+        : this.getActiveOpponentCount();
       const earlyStrength = req.street === 'preflop'
         ? preflopHandStrengthV2(this.holeCards, this.myPosition, personalityStyle)
         : postflopStrengthMCV2(this.holeCards, req.board, opponents);
@@ -961,7 +978,7 @@ export class BuiltinBotAgent implements PlayerAgent {
       }
     }
     if (req.street !== 'preflop') {
-      const numOpponents = Math.max(1, this.players.length - 1);
+      const numOpponents = this.getActiveOpponentCount();
       // Build opponent model for adaptive (曹操) exploitation
       const oppProfile = this.getAverageOpponentProfile();
       const oppModel = oppProfile.hands >= 5 ? {
@@ -997,7 +1014,7 @@ export class BuiltinBotAgent implements PlayerAgent {
     // Preflop: use position-aware ranges like other styles. MDF defense
     // doesn't apply preflop and inflates VPIP to ~70%.
     if (style === 'gto' && req.street !== 'preflop') {
-      const opponents = Math.max(1, this.players.length - 1);
+      const opponents = this.getActiveOpponentCount();
       const gtoStrength = postflopStrengthMCV2(this.holeCards, req.board, opponents);
       const texture = analyzeBoard(req.board);
       const balancedReq: BalancedActionRequest = {
@@ -1010,7 +1027,7 @@ export class BuiltinBotAgent implements PlayerAgent {
         stack: req.stack,
         initialStack: req.initialStack,
       };
-      const decision = chooseBalancedAction(gtoStrength, balancedReq, texture, this.players.length);
+      const decision = chooseBalancedAction(gtoStrength, balancedReq, texture, opponents + 1);
       const { frequencies } = decision;
       return this.finalizeBuiltinDecision({
         action: decision.action,
@@ -1027,7 +1044,9 @@ export class BuiltinBotAgent implements PlayerAgent {
     }
 
     // ─── v2 Preflop: use getPreflopAction for position-aware decisions ────
-    const opponents = Math.max(1, this.players.length - 1);
+    const opponents = req.street === 'preflop'
+      ? Math.max(1, this.players.length - 1)
+      : this.getActiveOpponentCount();
     const bbCount = req.stack / Math.max(this.bigBlind, 1);
 
     if (req.street === 'preflop') {
@@ -1229,6 +1248,25 @@ export class BuiltinBotAgent implements PlayerAgent {
     });
   }
 
+  private getFoldedSeatsThisHand(): Set<number> {
+    return getFoldedSeats(this.handActions);
+  }
+
+  private getActiveOpponentSeats(): number[] {
+    const folded = this.getFoldedSeatsThisHand();
+    return this.players
+      .map(p => p.seat)
+      .filter(seat => seat !== this.mySeat && !folded.has(seat));
+  }
+
+  private getActiveOpponentCount(): number {
+    return countActiveOpponents(
+      this.players.map(p => p.seat),
+      this.mySeat,
+      this.handActions,
+    );
+  }
+
   /** Compute average opponent VPIP rate and aggression factor. */
   private getAverageOpponentProfile(): OpponentProfile {
     let totalHands = 0, totalVpip = 0, totalPfr = 0, totalAgg = 0, totalPass = 0;
@@ -1271,6 +1309,27 @@ export type HandActionRecord = Record<
   'preflop' | 'flop' | 'turn' | 'river',
   Array<{ seat: number; action: ActionType; amount: number }>
 >;
+
+export function getFoldedSeats(actions: HandActionRecord): Set<number> {
+  const folded = new Set<number>();
+  for (const street of ['preflop', 'flop', 'turn', 'river'] as const) {
+    for (const action of actions[street]) {
+      if (action.action === 'fold') {
+        folded.add(action.seat);
+      }
+    }
+  }
+  return folded;
+}
+
+export function countActiveOpponents(
+  seats: number[],
+  mySeat: number,
+  actions: HandActionRecord,
+): number {
+  const folded = getFoldedSeats(actions);
+  return Math.max(1, seats.filter(seat => seat !== mySeat && !folded.has(seat)).length);
+}
 
 /**
  * Compute bluff decay based on opponent calls on prior streets.

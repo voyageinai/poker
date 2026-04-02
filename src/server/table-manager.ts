@@ -463,16 +463,17 @@ export class TableManager {
           action: event.action,
           amount: event.amount,
         } satisfies WsServerMessage);
-        // Notify all bots of this action
+        // Notify all bots of this action, including the actor.
+        // Builtin personalities track their own prior lines (e.g. limp-reraise,
+        // delayed c-bet, stop-and-go) from these canonical table events.
         for (const [seatIdx, info] of this.agents) {
-          if (seatIdx !== event.seat) {
-            info.agent.notify({
-              type: 'player_action',
-              seat: event.seat,
-              action: event.action as 'fold' | 'check' | 'call' | 'raise' | 'allin',
-              amount: event.amount,
-            });
-          }
+          void seatIdx;
+          info.agent.notify({
+            type: 'player_action',
+            seat: event.seat,
+            action: event.action as 'fold' | 'check' | 'call' | 'raise' | 'allin',
+            amount: event.amount,
+          });
         }
         break;
       }

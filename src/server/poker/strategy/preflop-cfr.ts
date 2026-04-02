@@ -63,15 +63,15 @@ const RANK_ORDER = '23456789TJQKA';
 const STYLE_DEVIATIONS: Record<SystemBotStyle, StyleDeviation> = {
   gto:        { rangeScale: 1.0,  foldShift: 0,      raiseShift: 0,      callShift: 0 },
   nit:        { rangeScale: 0.40, foldShift: +0.28,  raiseShift: -0.08,  callShift: -0.20 },
-  tag:        { rangeScale: 0.80, foldShift: +0.10,  raiseShift: +0.05,  callShift: -0.15 },
+  tag:        { rangeScale: 0.92, foldShift: +0.04,  raiseShift: +0.08,  callShift: -0.12 },
   lag:        { rangeScale: 1.5,  foldShift: -0.25,  raiseShift: +0.30,  callShift: -0.05 },
   station:    { rangeScale: 2.0,  foldShift: -0.60,  raiseShift: -0.25,  callShift: +0.85 },
   maniac:     { rangeScale: 2.5,  foldShift: -0.50,  raiseShift: +0.55,  callShift: -0.05 },
-  trapper:    { rangeScale: 0.85, foldShift: +0.05,  raiseShift: -0.25,  callShift: +0.20 },
+  trapper:    { rangeScale: 0.95, foldShift: 0,      raiseShift: -0.18,  callShift: +0.18 },
   bully:      { rangeScale: 1.3,  foldShift: -0.15,  raiseShift: +0.20,  callShift: -0.05 },
   tilter:     { rangeScale: 0.85, foldShift: +0.08,  raiseShift: 0,      callShift: -0.08 },
-  shortstack: { rangeScale: 0.65, foldShift: +0.15,  raiseShift: +0.15,  callShift: -0.30 },
-  adaptive:   { rangeScale: 1.0,  foldShift: 0,      raiseShift: 0,      callShift: 0 },
+  shortstack: { rangeScale: 0.75, foldShift: +0.08,  raiseShift: +0.22,  callShift: -0.30 },
+  adaptive:   { rangeScale: 1.10, foldShift: -0.08,  raiseShift: +0.10,  callShift: -0.02 },
 };
 
 // ─── Load CFR tables (graceful fallback) ─────────────────────────────────────

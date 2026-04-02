@@ -38,15 +38,15 @@ const POSITION_RFI: Record<Position, number> = {
 
 const STYLE_MODIFIERS: Record<SystemBotStyle, StyleRangeModifier> = {
   nit:        { rfiShift: -0.15, premiumBoost: 0.05,  suitedBonus: 0.00, speculative: -0.05 },
-  tag:        { rfiShift: -0.03, premiumBoost: 0.03,  suitedBonus: 0.02, speculative: 0.00 },
+  tag:        { rfiShift:  0.02, premiumBoost: 0.03,  suitedBonus: 0.03, speculative: 0.02 },
   lag:        { rfiShift:  0.12, premiumBoost: 0.00,  suitedBonus: 0.04, speculative: 0.20 },
   station:    { rfiShift:  0.18, premiumBoost: -0.10, suitedBonus: 0.02, speculative: 0.05 },
   maniac:     { rfiShift:  0.25, premiumBoost: -0.05, suitedBonus: 0.03, speculative: 0.15 },
-  trapper:    { rfiShift:  0.00, premiumBoost: 0.05,  suitedBonus: 0.02, speculative: 0.03 },
+  trapper:    { rfiShift:  0.05, premiumBoost: 0.05,  suitedBonus: 0.03, speculative: 0.08 },
   bully:      { rfiShift:  0.05, premiumBoost: 0.00,  suitedBonus: 0.01, speculative: 0.02 },
   tilter:     { rfiShift:  0.02, premiumBoost: 0.00,  suitedBonus: 0.01, speculative: 0.01 },
-  shortstack: { rfiShift: -0.05, premiumBoost: 0.08,  suitedBonus: -0.02, speculative: -0.08 },
-  adaptive:   { rfiShift:  0.00, premiumBoost: 0.02,  suitedBonus: 0.02, speculative: 0.02 },
+  shortstack: { rfiShift: -0.02, premiumBoost: 0.08,  suitedBonus: -0.02, speculative: -0.08 },
+  adaptive:   { rfiShift:  0.04, premiumBoost: 0.02,  suitedBonus: 0.03, speculative: 0.05 },
   gto:        { rfiShift:  0.00, premiumBoost: 0.02,  suitedBonus: 0.02, speculative: 0.02 },
 };
 
@@ -261,15 +261,15 @@ export function getPreflopAction(
   // Call zone width varies by style
   const callZoneWidth: Record<SystemBotStyle, number> = {
     nit:        0.04,
-    tag:        0.08,
+    tag:        0.10,
     lag:        0.10,
     station:    0.22,
     maniac:     0.12,
-    trapper:    0.10,
+    trapper:    0.16,
     bully:      0.10,
     tilter:     0.10,
-    shortstack: 0.06,
-    adaptive:   0.10,
+    shortstack: 0.08,
+    adaptive:   0.14,
     gto:        0.06,
   };
   const callThreshold = rfiThreshold - callZoneWidth[style];
