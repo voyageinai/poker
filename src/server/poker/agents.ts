@@ -702,14 +702,45 @@ export class BuiltinBotAgent implements PlayerAgent {
     }
 
     // ─── Solver path: DCFR / Blueprint for postflop decisions ─────────
-    // Try solver-based decision first (DCFR for heads-up, blueprint+search if loaded).
-    // Returns null for multi-way pots or if solver is unavailable → falls through.
+    // Try solver-based decision first, BUT respect personality overrides above:
+    // - Shortstack push/fold already returned above (never reaches here)
+    // - Bully/tilter cfg mutations carry into heuristic fallback below
+    // - Solver applies its own style deviations (style-deviations.ts)
+    // Dynamic style shifting based on bot state:
+    // 林冲 (tilter): tilted → plays like 张飞 (maniac)
+    // 鲁智深 (bully): chip advantage → plays like 孙悟空 (lag)
+    let effectiveStyle: SystemBotStyle = style;
+    if (style === 'tilter' && this.tiltLevel > 0.3) {
+      effectiveStyle = this.tiltLevel > 0.7 ? 'maniac' : 'lag';
+      extraReasoning += this.tiltLevel > 0.7 ? ' 风雪山神庙!' : ' 渐失冷静.';
+    }
+    if (style === 'bully') {
+      const avgOppStack = this.players
+        .filter(p => p.seat !== this.mySeat)
+        .reduce((s, p) => s + p.stack, 0) / Math.max(1, this.players.length - 1);
+      const stackRatio = req.stack / Math.max(avgOppStack, 1);
+      if (stackRatio > 1.5) {
+        effectiveStyle = 'lag'; // 碾压模式: 宽范围高压
+        extraReasoning += ` 筹码碾压(${stackRatio.toFixed(1)}x)!`;
+      }
+    }
     if (req.street !== 'preflop') {
       const numOpponents = Math.max(1, this.players.length - 1);
+      // Build opponent model for adaptive (曹操) exploitation
+      const oppProfile = this.getAverageOpponentProfile();
+      const oppModel = oppProfile.hands >= 5 ? {
+        foldToCbet: oppProfile.foldToCbetRate,
+        foldTo3bet: oppProfile.foldToCbetRate, // approximate
+        vpip: oppProfile.vpipRate,
+        af: oppProfile.af,
+        wtsd: oppProfile.wtsdRate,
+        hands: oppProfile.hands,
+      } : undefined;
       const solverResult = solverDecision(
         this.holeCards, req.board, req.pot, req.stack,
         req.toCall, req.minRaise, req.currentBet,
-        req.street as 'flop' | 'turn' | 'river', style, numOpponents,
+        req.street as 'flop' | 'turn' | 'river', effectiveStyle, numOpponents,
+        oppModel,
       );
       if (solverResult) {
         const action: PokerAction = solverResult.amount > 0
@@ -720,7 +751,7 @@ export class BuiltinBotAgent implements PlayerAgent {
           debug: {
             equity: solverResult.debug?.strength ?? 0,
             potOdds: req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0,
-            reasoning: `${this.definition.name}: DCFR solver [${solverResult.debug?.source}] ${solverResult.debug?.iterations ?? 0} iterations. ${describeHolding(req.street, this.holeCards, req.board)}.`,
+            reasoning: `${this.definition.name}: DCFR solver [${solverResult.debug?.source}] ${solverResult.debug?.iterations ?? 0} iterations.${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
           },
         });
       }
@@ -785,7 +816,7 @@ export class BuiltinBotAgent implements PlayerAgent {
       const raisersAhead = req.history.filter(h => h.action === 'raise' || h.action === 'allin').length;
       const toCallBB = req.toCall / Math.max(this.bigBlind, 1);
       const potOdds = req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0;
-      const preflopDecision = getPreflopAction(this.holeCards, this.myPosition, style, {
+      const preflopDecision = getPreflopAction(this.holeCards, this.myPosition, effectiveStyle, {
         facing3Bet: raisersAhead >= 2,
         raisersAhead,
         stackBB: bbCount,
