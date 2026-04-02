@@ -700,8 +700,10 @@ export class BuiltinBotAgent implements PlayerAgent {
       }
     }
 
-    // ─── GTO (诸葛亮): use balanced mixed strategy ─────────────────────
-    if (style === 'gto') {
+    // ─── GTO (诸葛亮): use balanced mixed strategy (postflop only) ─────
+    // Preflop: use position-aware ranges like other styles. MDF defense
+    // doesn't apply preflop and inflates VPIP to ~70%.
+    if (style === 'gto' && req.street !== 'preflop') {
       const opponents = Math.max(1, this.players.length - 1);
       const gtoStrength = req.street === 'preflop'
         ? preflopHandStrengthV2(this.holeCards, this.myPosition, style)
@@ -1178,6 +1180,13 @@ function chooseRaiseAction(
       const capped = req.currentBet + Math.max(maxPreflop - chipsInPot - req.toCall, effectiveMinRaise);
       raiseTotal = clampInt(capped, minRaiseTotal, maxRaiseTotal);
     }
+  }
+
+  // Don't leave crumbs: if raise commits >50% of stack, just shove.
+  // Raising and leaving a tiny stack behind is strategically wrong.
+  const commitAmount = raiseTotal - req.currentBet + req.toCall;
+  if (commitAmount >= req.stack * 0.5) {
+    return { action: 'allin' };
   }
 
   return raiseTotal >= maxRaiseTotal ? { action: 'allin' } : { action: 'raise', amount: raiseTotal };

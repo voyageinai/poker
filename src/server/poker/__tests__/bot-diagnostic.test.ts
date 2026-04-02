@@ -374,6 +374,69 @@ describe('Tilter tilt mechanism', () => {
   }, 60000);
 });
 
+// ─── 7b. GTO preflop should use position-aware ranges, not MDF ──────────────
+
+describe('GTO preflop range calibration', () => {
+  it('GTO VPIP is under 35% (not MDF-inflated)', async () => {
+    // Run 200 hands profiling GTO preflop VPIP against a mix of styles
+    let vpipCount = 0;
+    const trials = 200;
+
+    for (let i = 0; i < trials; i++) {
+      const agent = createAgent('gto');
+      // Seat 0 facing a standard open raise from seat 3
+      notifyHand(agent, 0, ['7h', '4d'], { buttonSeat: 5 }); // random weak hand
+      const result = await agent.requestAction({
+        street: 'preflop',
+        board: [],
+        pot: 50,
+        currentBet: 20,
+        toCall: 20,
+        minRaise: 20,
+        stack: 980,
+        history: [{ seat: 3, action: 'raise' as const, amount: 20 }],
+      });
+      if (result.action === 'call' || result.action === 'raise' || result.action === 'allin') {
+        vpipCount++;
+      }
+    }
+
+    const vpipRate = vpipCount / trials;
+    // GTO should fold 74o facing a raise most of the time (< 35% VPIP)
+    // Before fix: MDF-based defense made this ~43%+
+    expect(vpipRate, `GTO VPIP with 74o = ${(vpipRate * 100).toFixed(1)}%, should be < 35%`)
+      .toBeLessThan(0.35);
+  }, 30000);
+
+  it('GTO PFR > 0% (actually raises with good hands)', async () => {
+    let pfrCount = 0;
+    const trials = 200;
+
+    for (let i = 0; i < trials; i++) {
+      const agent = createAgent('gto');
+      notifyHand(agent, 0, ['Ah', 'Kd'], { buttonSeat: 5 });
+      const result = await agent.requestAction({
+        street: 'preflop',
+        board: [],
+        pot: 30,
+        currentBet: 20,
+        toCall: 10,
+        minRaise: 20,
+        stack: 990,
+        history: [],
+      });
+      if (result.action === 'raise' || result.action === 'allin') {
+        pfrCount++;
+      }
+    }
+
+    const pfrRate = pfrCount / trials;
+    // GTO should raise AKo from EP at least 50% of the time
+    expect(pfrRate, `GTO PFR with AKo = ${(pfrRate * 100).toFixed(1)}%, should be > 50%`)
+      .toBeGreaterThan(0.50);
+  }, 30000);
+});
+
 // ─── 8. Bluff Decay: bots should bluff less on later streets after opponent called ──
 
 describe('Bluff decay: computeBluffDecay', () => {
