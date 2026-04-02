@@ -276,8 +276,19 @@ export function getPreflopActionCFR(
 ): { action: 'fold' | 'call' | 'raise'; frequency: number } | null {
   if (!cfrTables) return null;
 
+  // Quality gate: only use CFR tables when the solver has run enough iterations
+  // to converge. Below this threshold, the data has too much noise (e.g., 97o
+  // calling 4-bets, AA limping from UTG) and the heuristic is more reliable.
+  const MIN_CONVERGED_ITERATIONS = 1_000_000;
+  if (cfrTables.meta.iterations < MIN_CONVERGED_ITERATIONS) return null;
+
   // 1. Determine action sequence
   const actionSeq = getActionSequence(context.raisersAhead, context.facing3Bet);
+
+  // Skip CFR for "unopened" — the heuristic open-raise ranges are well-tuned
+  // and the solver's unopened data needs more iterations to converge.
+  // CFR tables shine for facing_raise/3bet/4bet where heuristics are weakest.
+  if (actionSeq === 'unopened') return null;
 
   // 2. Look up GTO strategy
   const gto = lookupGtoStrategy(cards, position, actionSeq);
@@ -287,7 +298,35 @@ export function getPreflopActionCFR(
   const styled = applyStyleDeviation(gto, style);
 
   // 4. Select action from mixed strategy
-  return selectAction(styled);
+  const result = selectAction(styled);
+  const label = canonicalizeLabel(cards);
+
+  // ── Sanity checks ─────────────────────────────────────────────────────
+  // These override solver noise for cases with clear poker-theoretic answers.
+  const PREMIUMS = new Set(['AA', 'KK', 'QQ', 'AKs', 'AKo']);
+
+  // (a) Premium hands should never fold in any scenario.
+  if (PREMIUMS.has(label) && result.action === 'fold') {
+    return { action: gto.raise > gto.call ? 'raise' : 'call', frequency: 0.9 };
+  }
+
+  // (b) Facing raises: the GTO fold frequency in the facing scenario itself
+  //     indicates hand quality. If GTO says fold >60% in this scenario AND
+  //     the style deviation overrode it to call/raise, fold anyway.
+  //     This catches maniac/LAG calling raises with garbage.
+  if (gto.fold > 0.60 && result.action !== 'fold') {
+    return { action: 'fold', frequency: gto.fold };
+  }
+
+  // (d) Facing 3bet+: even looser threshold. If GTO says fold >40% and
+  //     this is a 3bet+ scenario, fold. These are high-stakes decisions
+  //     where style deviations shouldn't override solver judgment.
+  if ((actionSeq === 'facing_3bet' || actionSeq === 'facing_4bet' || actionSeq === 'facing_allin')
+      && gto.fold > 0.40 && result.action !== 'fold') {
+    return { action: 'fold', frequency: gto.fold };
+  }
+
+  return result;
 }
 
 /**
