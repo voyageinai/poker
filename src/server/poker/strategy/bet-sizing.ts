@@ -20,18 +20,42 @@ export function geometricBetFraction(pot: number, stack: number, streetsLeft: nu
   return Math.pow(stack / pot + 1, 1 / streetsLeft) - 1
 }
 
-const styleModifiers: Record<SystemBotStyle, number> = {
-  maniac: 1.20,
-  lag: 1.10,
-  nit: 0.80,
-  gto: 1.00,
-  adaptive: 1.00,
-  tag: 1.00,
-  station: 0.90,
-  trapper: 0.85,
-  bully: 1.15,
-  tilter: 1.10,
-  shortstack: 1.00,
+// ─── Sizing Profiles: per-style, per-scenario bet sizing ───────────────────
+// preferred = pot fraction, variance = random jitter range (±)
+// GTO uses preferred=0 as sentinel → falls back to geometric bet fraction
+
+interface SizingEntry { preferred: number; variance: number }
+
+interface SizingProfile {
+  cbet: SizingEntry;
+  valueBet: SizingEntry;
+  bluff: SizingEntry;
+  raiseVsBet: { multiplier: number; variance: number };
+  riverBet: SizingEntry;
+}
+
+const SIZING_PROFILES: Record<SystemBotStyle, SizingProfile> = {
+  nit:        { cbet: { preferred: 0.33, variance: 0.05 }, valueBet: { preferred: 0.50, variance: 0.08 }, bluff: { preferred: 0.33, variance: 0.05 }, raiseVsBet: { multiplier: 2.5, variance: 0.2 }, riverBet: { preferred: 0.40, variance: 0.08 } },
+  tag:        { cbet: { preferred: 0.55, variance: 0.08 }, valueBet: { preferred: 0.67, variance: 0.10 }, bluff: { preferred: 0.55, variance: 0.08 }, raiseVsBet: { multiplier: 2.8, variance: 0.3 }, riverBet: { preferred: 0.67, variance: 0.10 } },
+  lag:        { cbet: { preferred: 0.67, variance: 0.10 }, valueBet: { preferred: 0.80, variance: 0.12 }, bluff: { preferred: 1.00, variance: 0.15 }, raiseVsBet: { multiplier: 3.0, variance: 0.3 }, riverBet: { preferred: 0.80, variance: 0.12 } },
+  station:    { cbet: { preferred: 0.50, variance: 0.05 }, valueBet: { preferred: 0.50, variance: 0.05 }, bluff: { preferred: 0.50, variance: 0.05 }, raiseVsBet: { multiplier: 2.5, variance: 0.2 }, riverBet: { preferred: 0.50, variance: 0.05 } },
+  maniac:     { cbet: { preferred: 0.80, variance: 0.15 }, valueBet: { preferred: 1.20, variance: 0.20 }, bluff: { preferred: 1.50, variance: 0.25 }, raiseVsBet: { multiplier: 3.5, variance: 0.5 }, riverBet: { preferred: 1.50, variance: 0.20 } },
+  trapper:    { cbet: { preferred: 0.25, variance: 0.05 }, valueBet: { preferred: 0.33, variance: 0.08 }, bluff: { preferred: 0.50, variance: 0.10 }, raiseVsBet: { multiplier: 2.2, variance: 0.2 }, riverBet: { preferred: 0.33, variance: 0.08 } },
+  bully:      { cbet: { preferred: 0.75, variance: 0.12 }, valueBet: { preferred: 1.00, variance: 0.15 }, bluff: { preferred: 1.20, variance: 0.18 }, raiseVsBet: { multiplier: 3.0, variance: 0.4 }, riverBet: { preferred: 1.00, variance: 0.15 } },
+  tilter:     { cbet: { preferred: 0.55, variance: 0.10 }, valueBet: { preferred: 0.67, variance: 0.12 }, bluff: { preferred: 0.67, variance: 0.15 }, raiseVsBet: { multiplier: 2.8, variance: 0.4 }, riverBet: { preferred: 0.67, variance: 0.12 } },
+  shortstack: { cbet: { preferred: 0.50, variance: 0.08 }, valueBet: { preferred: 0.60, variance: 0.10 }, bluff: { preferred: 0.50, variance: 0.10 }, raiseVsBet: { multiplier: 2.5, variance: 0.3 }, riverBet: { preferred: 0.60, variance: 0.10 } },
+  adaptive:   { cbet: { preferred: 0.55, variance: 0.10 }, valueBet: { preferred: 0.67, variance: 0.10 }, bluff: { preferred: 0.67, variance: 0.10 }, raiseVsBet: { multiplier: 2.8, variance: 0.3 }, riverBet: { preferred: 0.67, variance: 0.10 } },
+  gto:        { cbet: { preferred: 0, variance: 0 }, valueBet: { preferred: 0, variance: 0 }, bluff: { preferred: 0, variance: 0 }, raiseVsBet: { multiplier: 0, variance: 0 }, riverBet: { preferred: 0, variance: 0 } },
+}
+
+function computeTextureAdj(texture: BoardTexture | null): number {
+  if (!texture) return 1.0
+  let adj = 1.0
+  if (texture.flushDraw === 'monotone') adj *= 1.35
+  else if (texture.wetness < 0.25) adj *= 0.55
+  else if (texture.wetness > 0.55) adj *= 1.25
+  if (texture.pairedness === 'paired' || texture.pairedness === 'trips') adj *= 0.75
+  return adj
 }
 
 export function chooseBetSize(
@@ -60,47 +84,40 @@ export function chooseBetSize(
     return { action: 'raise', amount: stack }
   }
 
-  // Compute geometric base
-  let fraction = geometricBetFraction(pot, stack, streetsRemaining)
+  const profile = SIZING_PROFILES[style]
 
-  // Texture adjustments (multiply fraction)
-  if (texture !== null) {
-    // Flush draw monotone overrides wet multiplier
-    if (texture.flushDraw === 'monotone') {
-      fraction *= 1.35
-    } else if (texture.wetness < 0.25) {
-      fraction *= 0.55
-    } else if (texture.wetness > 0.55) {
-      fraction *= 1.25
-    }
-    // else wetness 0.25~0.55: no adjustment (x1.0)
-
-    // Paired board adjustment (stacks with above)
-    if (texture.pairedness === 'paired' || texture.pairedness === 'trips') {
-      fraction *= 0.75
-    }
+  // GTO / geometric fallback (preferred=0 sentinel)
+  if (profile.cbet.preferred === 0) {
+    let fraction = geometricBetFraction(pot, stack, streetsRemaining)
+    fraction *= computeTextureAdj(texture)
+    if (isBluff) fraction *= 1.15
+    else if (strength > 0.80) fraction *= 1.10
+    const rawAmount = Math.round(pot * fraction)
+    if (rawAmount < minRaise) return { action: 'raise', amount: minRaise }
+    if (rawAmount > stack) return { action: 'raise', amount: stack }
+    return { action: 'raise', amount: rawAmount }
   }
 
-  // Strength/bluff adjustment
-  if (isBluff) {
-    fraction *= 1.15
-  } else if (strength > 0.80) {
-    fraction *= 1.10
-  }
+  // Select scenario-appropriate sizing
+  const isCbetSpot = streetsRemaining >= 3  // flop with streets ahead
+  const isRiver = streetsRemaining === 1
+  const scenario = isBluff ? profile.bluff
+    : isCbetSpot ? profile.cbet
+    : isRiver ? profile.riverBet
+    : profile.valueBet
 
-  // Style modifier
-  fraction *= styleModifiers[style]
+  // Apply random variance for natural sizing variation
+  const jitter = (Math.random() * 2 - 1) * scenario.variance
+  let fraction = Math.max(0.20, scenario.preferred + jitter)
 
-  // Compute raw amount
+  // Texture still modulates
+  fraction *= computeTextureAdj(texture)
+
   const rawAmount = Math.round(pot * fraction)
 
   // Legal clamping
-  if (rawAmount < minRaise) {
-    return { action: 'raise', amount: minRaise }
-  }
-  if (rawAmount > stack) {
-    return { action: 'raise', amount: stack }
-  }
+  if (rawAmount < minRaise) return { action: 'raise', amount: minRaise }
+  if (rawAmount > stack) return { action: 'raise', amount: stack }
   return { action: 'raise', amount: rawAmount }
 }
 

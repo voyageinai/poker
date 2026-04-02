@@ -177,3 +177,64 @@ export function selectMaxAction(strategy: ActionProbabilities): string {
 
   return bestAction || 'check';
 }
+
+// ─── Bet-size preference weighting ─────────────────────────────────────────
+// When the solver outputs multiple bet sizes (bet_33, bet_67, bet_100, bet_150),
+// the original code treated them identically across styles. This table shifts
+// the size distribution per personality — maniac prefers overbets, nit prefers small.
+
+const BET_SIZE_ACTIONS = new Set(['bet_33', 'bet_67', 'bet_100', 'bet_150', 'allin']);
+
+const SIZE_PREFERENCE: Partial<Record<SystemBotStyle, Record<string, number>>> = {
+  nit:        { bet_33: 2.0, bet_67: 1.0, bet_100: 0.3, bet_150: 0.1, allin: 0.1 },
+  tag:        { bet_33: 1.2, bet_67: 1.3, bet_100: 0.8, bet_150: 0.4, allin: 0.3 },
+  lag:        { bet_33: 0.6, bet_67: 1.2, bet_100: 1.5, bet_150: 1.2, allin: 0.8 },
+  station:    { bet_33: 1.0, bet_67: 1.0, bet_100: 1.0, bet_150: 1.0, allin: 1.0 },
+  maniac:     { bet_33: 0.3, bet_67: 0.8, bet_100: 1.5, bet_150: 2.5, allin: 1.5 },
+  trapper:    { bet_33: 2.5, bet_67: 1.0, bet_100: 0.3, bet_150: 0.1, allin: 0.1 },
+  bully:      { bet_33: 0.5, bet_67: 1.0, bet_100: 1.5, bet_150: 2.0, allin: 1.0 },
+  tilter:     { bet_33: 0.8, bet_67: 1.0, bet_100: 1.2, bet_150: 1.0, allin: 0.8 },
+  shortstack: { bet_33: 0.8, bet_67: 1.0, bet_100: 1.2, bet_150: 0.8, allin: 1.5 },
+};
+
+/**
+ * Re-weight bet-size actions in a solver strategy according to style preferences.
+ * Non-bet actions (fold, check, call) are untouched; only the distribution among
+ * bet_33/bet_67/bet_100/bet_150/allin is shifted and re-normalized.
+ */
+export function applyStyleSizing(
+  strategy: ActionProbabilities,
+  style: SystemBotStyle,
+): ActionProbabilities {
+  const prefs = SIZE_PREFERENCE[style];
+  // No preference table → return unchanged (gto, adaptive)
+  if (!prefs) return strategy;
+
+  const result: ActionProbabilities = {};
+  let betTotal = 0;
+  let origBetTotal = 0;
+
+  // First pass: apply weights to bet-size actions, copy others unchanged
+  for (const [action, prob] of Object.entries(strategy)) {
+    if (BET_SIZE_ACTIONS.has(action) && prefs[action] !== undefined) {
+      const weighted = prob * prefs[action];
+      result[action] = weighted;
+      betTotal += weighted;
+      origBetTotal += prob;
+    } else {
+      result[action] = prob;
+    }
+  }
+
+  // Re-normalize bet-size actions to preserve original total bet probability
+  if (betTotal > 0 && origBetTotal > 0) {
+    const scale = origBetTotal / betTotal;
+    for (const action of Object.keys(result)) {
+      if (BET_SIZE_ACTIONS.has(action)) {
+        result[action] *= scale;
+      }
+    }
+  }
+
+  return result;
+}

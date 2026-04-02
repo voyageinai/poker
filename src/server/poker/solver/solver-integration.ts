@@ -22,7 +22,7 @@ import { blueprint, abstractToActualAmount } from './blueprint';
 import type { AbstractAction } from './blueprint';
 import { depthLimitedSearch } from './depth-limited-search';
 import { safeExploit } from './safe-exploit';
-import { applyPostflopStyleDeviation, sampleAction } from './style-deviations';
+import { applyPostflopStyleDeviation, applyStyleSizing, sampleAction } from './style-deviations';
 import { postflopStrengthMC } from '../strategy/equity';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -222,6 +222,7 @@ export function solverDecision(
     // Apply style deviations
     const strength = postflopStrengthMC(holeCards, board, opponents);
     strategy = applyPostflopStyleDeviation(strategy, style, strength);
+    strategy = applyStyleSizing(strategy, style);
 
     // Sample action from strategy
     const selectedAction = sampleAction(strategy);
@@ -266,6 +267,7 @@ export function solverDecision(
       // Apply style deviations
       const strength = postflopStrengthMC(holeCards, board, opponents);
       strategy = applyPostflopStyleDeviation(strategy, style, strength);
+      strategy = applyStyleSizing(strategy, style);
 
       const selectedAction = sampleAction(strategy);
       const concrete = mapToConcreteAction(selectedAction, pot, stack, minRaise, toCall);

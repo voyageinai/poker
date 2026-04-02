@@ -23,6 +23,8 @@ import { chooseBalancedAction, type BalancedActionRequest } from './strategy/bal
 import { OpponentTracker } from './strategy/opponent-model';
 import { chooseBetSize, type LegalConstraints } from './strategy/bet-sizing';
 import { solverDecision } from './solver/solver-integration';
+import { matchPlaybook, type PlaybookContext, type Position as PlaybookPosition } from './strategy/playbook';
+import { checkUnconditionalBluff } from './strategy/unconditional-bluff';
 
 const BOT_ACTION_TIMEOUT_MS = parseInt(process.env.BOT_ACTION_TIMEOUT_MS ?? '5000', 10);
 const HUMAN_ACTION_TIMEOUT_MS = parseInt(process.env.HUMAN_ACTION_TIMEOUT_MS ?? '30000', 10);
@@ -487,6 +489,11 @@ export class BuiltinBotAgent implements PlayerAgent {
   // ─── Multi-street memory ─────────────────────────────────────────────────
   private handActions: HandActionRecord = { preflop: [], flop: [], turn: [], river: [] };
 
+  // ─── Playbook & bluff line state ─────────────────────────────────────────
+  private currentBluffLine = false;
+  private bluffStreetCount = 0;
+  private myActionsThisHand: Array<{ street: 'preflop' | 'flop' | 'turn' | 'river'; action: string }> = [];
+
   // ─── Human pressure tracking ────────────────────────────────────────────
   private playerMeta = new Map<number, { isBot: boolean; elo?: number }>();
 
@@ -505,6 +512,9 @@ export class BuiltinBotAgent implements PlayerAgent {
         this.currentStreet = 'preflop';
         this.preflopActors.clear();
         this.handActions = { preflop: [], flop: [], turn: [], river: [] };
+        this.currentBluffLine = false;
+        this.bluffStreetCount = 0;
+        this.myActionsThisHand = [];
         this.myPosition = calcPosition(
           msg.seat,
           msg.buttonSeat,
@@ -555,7 +565,11 @@ export class BuiltinBotAgent implements PlayerAgent {
       case 'player_action': {
         // Track all actions for multi-street pattern detection
         this.handActions[this.currentStreet].push({ seat: msg.seat, action: msg.action, amount: msg.amount });
-        if (msg.seat === this.mySeat) break;
+        // Track my own actions for playbook priorMyActions matching
+        if (msg.seat === this.mySeat) {
+          this.myActionsThisHand.push({ street: this.currentStreet, action: msg.action });
+          break;
+        }
         const s = this.opponentStats.get(msg.seat);
         if (!s) break;
         // Legacy seat-keyed stats
@@ -661,6 +675,89 @@ export class BuiltinBotAgent implements PlayerAgent {
             reasoning: `${this.definition.name}: ${bbCount.toFixed(0)}BB 短码模式, ${action.action === 'allin' ? '全下!' : '弃牌等待.'}`,
           },
         });
+      }
+    }
+
+    // ─── Playbook: signature moves (checked before solver/heuristic) ────────
+    {
+      const opponents = Math.max(1, this.players.length - 1);
+      const earlyStrength = req.street === 'preflop'
+        ? preflopHandStrengthV2(this.holeCards, this.myPosition, style)
+        : postflopStrengthMCV2(this.holeCards, req.board, opponents);
+
+      const avgOppStack = this.players
+        .filter(p => p.seat !== this.mySeat)
+        .reduce((s, p) => s + p.stack, 0) / Math.max(1, this.players.length - 1);
+
+      const facingAction: 'none' | 'bet' | 'raise' = req.toCall <= 0 ? 'none'
+        : (req.history.length > 0 && req.history[req.history.length - 1].action === 'raise') ? 'raise' : 'bet';
+
+      const pbCtx: PlaybookContext = {
+        street: req.street,
+        position: this.myPosition as PlaybookPosition,
+        facingAction,
+        opponents,
+        stackBB: req.stack / Math.max(this.bigBlind, 1),
+        pot: req.pot,
+        stack: req.stack,
+        toCall: req.toCall,
+        minRaise: req.minRaise,
+        currentBet: req.currentBet,
+        boardTexture: req.street !== 'preflop' ? analyzeBoard(req.board) : null,
+        strength: earlyStrength,
+        priorMyActions: this.myActionsThisHand,
+        chipAdvantageRatio: req.stack / Math.max(avgOppStack, 1),
+        tiltLevel: this.tiltLevel,
+        bigBlind: this.bigBlind,
+      };
+
+      // [1] Playbook signature moves
+      const pbResult = matchPlaybook(style, pbCtx);
+      if (pbResult) {
+        const action: PokerAction = pbResult.amount > 0
+          ? { action: pbResult.action as 'raise', amount: pbResult.amount }
+          : { action: pbResult.action as 'fold' | 'check' | 'call' | 'allin' };
+        return Promise.resolve({
+          ...action,
+          debug: {
+            equity: earlyStrength,
+            reasoning: `${this.definition.name}: [${pbResult.patternName}] 签名招式!${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
+          },
+        });
+      }
+
+      // [2] Unconditional bluff engine (postflop only)
+      if (req.street !== 'preflop') {
+        const bluffResult = checkUnconditionalBluff(
+          style,
+          this.myPosition as 'UTG' | 'MP' | 'CO' | 'BTN' | 'SB' | 'BB',
+          req.street,
+          pbCtx.boardTexture,
+          req.toCall > 0,
+          this.currentBluffLine,
+          this.bluffStreetCount,
+          req.pot, req.stack, req.minRaise, req.currentBet, req.toCall, this.bigBlind,
+        );
+        if (bluffResult) {
+          this.currentBluffLine = bluffResult.isBluffLine;
+          this.bluffStreetCount++;
+          const action: PokerAction = bluffResult.amount >= req.stack
+            ? { action: 'allin' }
+            : { action: bluffResult.action, amount: bluffResult.amount };
+          return Promise.resolve({
+            ...action,
+            debug: {
+              equity: earlyStrength,
+              reasoning: `${this.definition.name}: [${bluffResult.source}] ${this.bluffStreetCount > 1 ? `连续施压第${this.bluffStreetCount}街` : '位置 bluff'} @ ${this.myPosition}.${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
+            },
+          });
+        }
+        // If bluff engine didn't fire, reset bluff line for this street
+        if (this.currentBluffLine && req.toCall <= 0) {
+          // We were in a bluff line but chose not to continue — end the line
+          this.currentBluffLine = false;
+          this.bluffStreetCount = 0;
+        }
       }
     }
 
