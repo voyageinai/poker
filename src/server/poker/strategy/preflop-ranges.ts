@@ -230,17 +230,18 @@ export function getPreflopAction(
     strength -= 0.12;
   }
 
-  // Gradual commitment penalty: the more BB you need to call, the tighter you should be
-  // This prevents station from calling 5-bets with 42o
-  // Coefficient varies by style: station has smallest penalty, nit has largest
+  // Gradual commitment penalty: the more BB you need to call, the tighter you should be.
+  // Uses logarithmic scaling so 3-bets (6BB) still penalize junk, but all-ins (50BB)
+  // don't nuke premium hands into negative territory.
+  // At 6BB: log2(5)=2.32 → TAG penalty ~0.14.  At 50BB: log2(49)=5.61 → TAG penalty ~0.34.
   const commitPenaltyCoeff: Record<SystemBotStyle, number> = {
     nit: 0.08, tag: 0.06, lag: 0.04, station: 0.025, maniac: 0.02,
     trapper: 0.05, bully: 0.04, tilter: 0.04, shortstack: 0.06, adaptive: 0.05, gto: 0.05,
   };
   if (context.toCallBB && context.toCallBB > 2) {
-    // Penalty scales with how many BB you need to call beyond a standard open (2BB)
     const excessBB = context.toCallBB - 2;
-    strength -= excessBB * commitPenaltyCoeff[style];
+    const logPenalty = Math.log2(1 + excessBB) * commitPenaltyCoeff[style];
+    strength -= logPenalty;
   }
 
   // Station style prefers calling over raising against aggression
