@@ -46,17 +46,31 @@ interface StyleDeviation {
 
 const RANK_ORDER = '23456789TJQKA';
 
+// ─── Style deviations: each bot's personality shifts from GTO baseline ───
+// These are AGGRESSIVE deviations — designed to make each bot feel distinct.
+//
+// 司马懿 nit:     "隐忍蛰伏，只在必胜时出手" → 极窄范围，大量弃牌
+// 赵云 tag:       "攻守兼备，牌力精准" → 略紧于GTO，精确价值下注
+// 孙悟空 lag:     "出牌范围无边界，全程高压" → 宽范围，高加注频率
+// 猪八戒 station: "什么牌都想看看" → 几乎不弃牌，大量跟注
+// 张飞 maniac:    "逢牌必加，疯狂下注" → 极宽范围，疯狂加注
+// 王熙凤 trapper: "慢打大牌设埋伏" → 大牌跟注不加注，诱导对手下注
+// 鲁智深 bully:   "专挑短码欺负" → 宽范围持续施压
+// 林冲 tilter:    "平时沉稳，连输后怒火" → 基线略紧（平时状态）
+// 燕青 shortstack: "以小博大全下逼迫" → 紧范围，高加注（push/fold）
+// 曹操 adaptive:  "观察弱点精准剥削" → 基线同GTO，靠 safe-exploit 系统偏移
+// 诸葛亮 gto:     "攻守完美平衡" → 零偏移
 const STYLE_DEVIATIONS: Record<SystemBotStyle, StyleDeviation> = {
   gto:        { rangeScale: 1.0,  foldShift: 0,      raiseShift: 0,      callShift: 0 },
-  nit:        { rangeScale: 0.40, foldShift: +0.30,  raiseShift: -0.10,  callShift: -0.20 },
-  tag:        { rangeScale: 0.85, foldShift: +0.08,  raiseShift: +0.02,  callShift: -0.10 },
-  lag:        { rangeScale: 1.2,  foldShift: -0.15,  raiseShift: +0.15,  callShift: 0 },
-  station:    { rangeScale: 1.6,  foldShift: -0.50,  raiseShift: -0.20,  callShift: +0.70 },
-  maniac:     { rangeScale: 1.4,  foldShift: -0.35,  raiseShift: +0.25,  callShift: +0.10 },
-  trapper:    { rangeScale: 0.9,  foldShift: +0.05,  raiseShift: -0.10,  callShift: +0.05 },
-  bully:      { rangeScale: 1.1,  foldShift: -0.10,  raiseShift: +0.10,  callShift: 0 },
-  tilter:     { rangeScale: 0.9,  foldShift: +0.05,  raiseShift: +0.02,  callShift: -0.07 },
-  shortstack: { rangeScale: 0.8,  foldShift: +0.10,  raiseShift: +0.05,  callShift: -0.15 },
+  nit:        { rangeScale: 0.40, foldShift: +0.28,  raiseShift: -0.08,  callShift: -0.20 },
+  tag:        { rangeScale: 0.80, foldShift: +0.10,  raiseShift: +0.05,  callShift: -0.15 },
+  lag:        { rangeScale: 1.5,  foldShift: -0.25,  raiseShift: +0.30,  callShift: -0.05 },
+  station:    { rangeScale: 2.0,  foldShift: -0.60,  raiseShift: -0.25,  callShift: +0.85 },
+  maniac:     { rangeScale: 2.5,  foldShift: -0.50,  raiseShift: +0.55,  callShift: -0.05 },
+  trapper:    { rangeScale: 0.85, foldShift: +0.05,  raiseShift: -0.25,  callShift: +0.20 },
+  bully:      { rangeScale: 1.3,  foldShift: -0.15,  raiseShift: +0.20,  callShift: -0.05 },
+  tilter:     { rangeScale: 0.85, foldShift: +0.08,  raiseShift: 0,      callShift: -0.08 },
+  shortstack: { rangeScale: 0.65, foldShift: +0.15,  raiseShift: +0.15,  callShift: -0.30 },
   adaptive:   { rangeScale: 1.0,  foldShift: 0,      raiseShift: 0,      callShift: 0 },
 };
 
@@ -302,7 +316,8 @@ export function getPreflopActionCFR(
   // BB unopened: CFR "call" = "check for free" (no cost to see flop).
   // The caller (agents.ts) expects "fold" → converts to "check" when toCall=0.
   // Return "fold" when GTO doesn't raise, matching the heuristic semantic.
-  if (position === 'BB' && actionSeq === 'unopened' && result.action === 'call') {
+  // Exception: premium hands should always raise (not get converted to fold).
+  if (position === 'BB' && actionSeq === 'unopened' && result.action === 'call' && !PREMIUMS.has(label)) {
     return { action: 'fold', frequency: 1 - styled.raise };
   }
 
@@ -313,19 +328,33 @@ export function getPreflopActionCFR(
     return { action: 'raise', frequency: 0.95 };
   }
 
-  // (b) Facing raises: if GTO says fold >95% in this scenario, the hand is
-  //     absolute garbage — override style deviation to fold regardless of style.
-  //     Below 95%, let style deviations control (station needs to call marginal hands).
-  if (gto.fold > 0.96 && result.action !== 'fold') {
+  // (b) Garbage override: if GTO says fold >96% AND the style isn't
+  //     inherently loose (station/maniac), force fold.
+  //     Station ("什么牌都想看看") and maniac ("逢牌必加") SKIP this check
+  //     because their whole identity is playing garbage hands.
+  // Style-dependent garbage thresholds:
+  // - station: "什么牌都想看看" → almost never forced to fold (threshold 100%)
+  // - maniac: "逢牌必加" when unopened, but facing raises has a floor (99%)
+  // - other styles: standard threshold (96%)
+  const garbageThreshold = style === 'station' ? 1.01  // station: never forced fold
+    : style === 'maniac' ? 0.965                        // maniac: fold the very worst garbage facing raises
+    : 0.96;                                              // others: standard
+
+  if (gto.fold > garbageThreshold && result.action !== 'fold') {
     return { action: 'fold', frequency: gto.fold };
   }
 
-  // (d) Facing 3bet+: even looser threshold. If GTO says fold >40% and
-  //     this is a 3bet+ scenario, fold. These are high-stakes decisions
-  //     where style deviations shouldn't override solver judgment.
-  if ((actionSeq === 'facing_3bet' || actionSeq === 'facing_4bet' || actionSeq === 'facing_allin')
-      && gto.fold > 0.40 && result.action !== 'fold') {
-    return { action: 'fold', frequency: gto.fold };
+  // (d) Facing 3bet+: tighter threshold.
+  //     station skips this entirely (calls anything).
+  //     maniac: respects 3bet+ with a high bar (90%).
+  //     others: strict threshold (40%).
+  if (actionSeq === 'facing_3bet' || actionSeq === 'facing_4bet' || actionSeq === 'facing_allin') {
+    // Station still folds against 4bet+ (even 猪八戒 isn't THAT loose)
+    // Maniac folds some garbage against 3bet
+    const foldBar = style === 'station' ? 0.70 : style === 'maniac' ? 0.80 : 0.40;
+    if (gto.fold > foldBar && result.action !== 'fold') {
+      return { action: 'fold', frequency: gto.fold };
+    }
   }
 
   return result;

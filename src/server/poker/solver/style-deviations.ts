@@ -28,17 +28,30 @@ export interface PostflopDeviation {
 
 // ─── Style deviation table ─────────────────────────────────────────────────
 
+// ─── Postflop style deviations: match the character personalities ──────
+//
+// 司马懿 nit:     几乎不 bluff，只下注坚果牌。面对加注就弃
+// 赵云 tag:       低频 bluff，精准 value bet。面对加注偶尔弃
+// 孙悟空 lag:     高频 bluff，大额 value bet。很少弃牌面对加注
+// 猪八戒 station: 从不 bluff，从不弃牌。疯狂跟注到 showdown
+// 张飞 maniac:    疯狂 bluff，疯狂加注。永远选最激进的动作
+// 王熙凤 trapper: 低频 bluff，但大牌 check 而不是 bet（慢打诱敌）
+// 鲁智深 bully:   高频 bluff（欺软怕硬），正常 value bet
+// 林冲 tilter:    基线沉稳（此处表示非 tilt 状态）
+// 燕青 shortstack: 不 bluff（筹码宝贵），全押或弃
+// 曹操 adaptive:  靠 safe-exploit 系统，基线同 GTO
+// 诸葛亮 gto:     完美平衡
 export const POSTFLOP_STYLE_DEVIATIONS: Record<SystemBotStyle, PostflopDeviation> = {
   gto:        { bluffMult: 1.0, valueMult: 1.0, foldShift: 0,     callShift: 0 },
-  nit:        { bluffMult: 0.3, valueMult: 0.9, foldShift: +0.15, callShift: -0.10 },
-  tag:        { bluffMult: 0.7, valueMult: 1.0, foldShift: +0.05, callShift: -0.05 },
-  lag:        { bluffMult: 1.4, valueMult: 1.1, foldShift: -0.10, callShift: 0 },
-  station:    { bluffMult: 0.1, valueMult: 0.8, foldShift: -0.25, callShift: +0.30 },
-  maniac:     { bluffMult: 2.0, valueMult: 1.2, foldShift: -0.20, callShift: +0.05 },
-  trapper:    { bluffMult: 0.5, valueMult: 1.0, foldShift: 0,     callShift: +0.05 },
-  bully:      { bluffMult: 1.3, valueMult: 1.1, foldShift: -0.08, callShift: 0 },
-  tilter:     { bluffMult: 0.8, valueMult: 0.9, foldShift: +0.03, callShift: -0.03 },
-  shortstack: { bluffMult: 0.6, valueMult: 1.0, foldShift: +0.05, callShift: -0.08 },
+  nit:        { bluffMult: 0.1, valueMult: 0.7, foldShift: +0.30, callShift: -0.20 },
+  tag:        { bluffMult: 0.5, valueMult: 1.1, foldShift: +0.08, callShift: -0.08 },
+  lag:        { bluffMult: 1.8, valueMult: 1.3, foldShift: -0.20, callShift: -0.05 },
+  station:    { bluffMult: 0.0, valueMult: 0.6, foldShift: -0.45, callShift: +0.55 },
+  maniac:     { bluffMult: 3.0, valueMult: 1.5, foldShift: -0.35, callShift: -0.10 },
+  trapper:    { bluffMult: 0.3, valueMult: 0.4, foldShift: -0.05, callShift: +0.25 },
+  bully:      { bluffMult: 1.8, valueMult: 1.2, foldShift: -0.15, callShift: -0.05 },
+  tilter:     { bluffMult: 0.7, valueMult: 0.9, foldShift: +0.05, callShift: -0.05 },
+  shortstack: { bluffMult: 0.2, valueMult: 1.2, foldShift: +0.10, callShift: -0.20 },
   adaptive:   { bluffMult: 1.0, valueMult: 1.0, foldShift: 0,     callShift: 0 },
 };
 
