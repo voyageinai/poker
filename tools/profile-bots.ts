@@ -135,7 +135,7 @@ async function playHand(
       type: 'new_hand',
       handId: `profile-h${handIdx}`,
       seat: s,
-      stack: handStartStacks[s] ?? stack,
+      stack: handStartStacks[s] ?? seatStacks[s],
       players: state.players.filter((p): p is PlayerState => p !== null).map(p => ({
         seat: p.seatIndex,
         playerId: p.userId,
