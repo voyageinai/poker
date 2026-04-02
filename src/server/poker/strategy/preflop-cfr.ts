@@ -310,11 +310,11 @@ export function getPreflopActionCFR(
     return { action: gto.raise > gto.call ? 'raise' : 'call', frequency: 0.9 };
   }
 
-  // (b) Facing raises: the GTO fold frequency in the facing scenario itself
-  //     indicates hand quality. If GTO says fold >60% in this scenario AND
-  //     the style deviation overrode it to call/raise, fold anyway.
-  //     This catches maniac/LAG calling raises with garbage.
-  if (gto.fold > 0.60 && result.action !== 'fold') {
+  // (b) Facing raises: if GTO says fold >85% in this scenario, the hand is
+  //     true garbage — override style deviation to fold. Threshold is 85%
+  //     (not lower) so loose styles can still call hands like 85o (fold ~77%)
+  //     and station can call K3o (fold ~64%), preserving style differentiation.
+  if (gto.fold > 0.85 && result.action !== 'fold') {
     return { action: 'fold', frequency: gto.fold };
   }
 
