@@ -25,7 +25,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '隐忍蛰伏，只在必胜时出手。极度保守的策略大师',
     style: 'nit',
     binaryPath: 'builtin:house-nit',
-    preferredBuyinBB: 35,
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-tag',
@@ -36,7 +36,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '攻守兼备的常胜将军。牌力精准，价值下注一击必中',
     style: 'tag',
     binaryPath: 'builtin:house-tag',
-    preferredBuyinBB: 45,
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-lag',
@@ -47,7 +47,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '大闹天宫的齐天大圣。出牌范围无边界，全程高压不喘气',
     style: 'lag',
     binaryPath: 'builtin:house-lag',
-    preferredBuyinBB: 55,
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-station',
@@ -58,7 +58,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '管不住手的天蓬元帅。什么牌都想看看，送你筹码最大方',
     style: 'station',
     binaryPath: 'builtin:house-station',
-    preferredBuyinBB: 45,
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-maniac',
@@ -91,7 +91,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '拳打镇关西的花和尚。专挑短码欺负，筹码碾压绝不留情',
     style: 'bully',
     binaryPath: 'builtin:house-bully',
-    preferredBuyinBB: 60,
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-tilter',
@@ -102,7 +102,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '忍辱负重的豹子头。平时沉稳如水，连输几把后怒火燎原',
     style: 'tilter',
     binaryPath: 'builtin:house-tilter',
-    preferredBuyinBB: 45,
+    preferredBuyinBB: 50,
   },
   {
     key: 'house-shortstack',
@@ -113,7 +113,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '身手敏捷的浪子。筹码虽少但招招致命，擅长以小博大全下逼迫',
     style: 'shortstack',
     binaryPath: 'builtin:house-shortstack',
-    preferredBuyinBB: 20,
+    preferredBuyinBB: 30,
   },
   {
     key: 'house-adaptive',
@@ -135,7 +135,7 @@ export const SYSTEM_BOTS: SystemBotDefinition[] = [
     description: '运筹帷幄的卧龙。攻守完美平衡，混合策略无懈可击',
     style: 'gto',
     binaryPath: 'builtin:house-gto',
-    preferredBuyinBB: 60,
+    preferredBuyinBB: 50,
   },
 ];
 
