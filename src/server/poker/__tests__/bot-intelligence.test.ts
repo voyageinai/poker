@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { STYLE_CONFIG_FOR_TEST, calcPosition, getPositionFactor, getBetSizingMultiplier, detectPatterns, computeExploit, countActiveOpponents, type HandActionRecord } from '../agents';
 import { postflopStrengthMC } from '../agents';
 import { assessHumanSkill, calcHumanPressure } from '../agents';
 import type { Card, PbpServerMessage } from '@/lib/types';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('STYLE_CONFIG intelligence fields', () => {
   const styles = Object.keys(STYLE_CONFIG_FOR_TEST) as Array<keyof typeof STYLE_CONFIG_FOR_TEST>;
@@ -314,6 +318,98 @@ describe('GTO bot uses MC equity', () => {
     // GTO (balanced strategy v2) with AA on a dry board should have good equity
     expect(result.debug?.equity).toBeGreaterThan(0.5);
     expect(['raise', 'check', 'allin']).toContain(result.action);
+  });
+});
+
+describe('Builtin bot runtime position wiring', () => {
+  it('shortstack uses button and seat to recognize the big blind jam spot', async () => {
+    const { BuiltinBotAgent } = await import('../agents');
+    const { SYSTEM_BOTS } = await import('@/lib/system-bots');
+    const shortstackDef = SYSTEM_BOTS.find(b => b.style === 'shortstack')!;
+    const agent = new BuiltinBotAgent('test-user', shortstackDef);
+
+    agent.notify({
+      type: 'new_hand',
+      handId: 'test-shortstack-bb',
+      seat: 5,
+      stack: 318,
+      players: [
+        { seat: 0, playerId: 'p0', displayName: 'P0', stack: 8000, isBot: true },
+        { seat: 1, playerId: 'p1', displayName: 'P1', stack: 8000, isBot: true },
+        { seat: 2, playerId: 'p2', displayName: 'P2', stack: 8000, isBot: true },
+        { seat: 3, playerId: 'p3', displayName: 'P3', stack: 8000, isBot: true },
+        { seat: 4, playerId: 'p4', displayName: 'P4', stack: 9377, isBot: true },
+        { seat: 5, playerId: 'hero', displayName: 'Hero', stack: 318, isBot: true },
+        { seat: 6, playerId: 'p6', displayName: 'P6', stack: 16956, isBot: true },
+        { seat: 7, playerId: 'p7', displayName: 'P7', stack: 8000, isBot: true },
+        { seat: 8, playerId: 'p8', displayName: 'P8', stack: 8000, isBot: true },
+      ],
+      smallBlind: 50,
+      bigBlind: 100,
+      buttonSeat: 3,
+    });
+    agent.notify({ type: 'hole_cards', cards: ['8h', '6h'] });
+
+    const result = await agent.requestAction({
+      street: 'preflop',
+      board: [],
+      pot: 200,
+      currentBet: 237,
+      toCall: 137,
+      minRaise: 137,
+      stack: 318,
+      initialStack: 418,
+      history: [{ seat: 4, action: 'raise', amount: 237 }],
+    });
+
+    expect(result.action).toBe('allin');
+    expect(result.debug?.reasoning).toContain('短码模式');
+  });
+
+  it('nit can defend the big blind when the runtime seat mapping is correct', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    const { BuiltinBotAgent } = await import('../agents');
+    const { SYSTEM_BOTS } = await import('@/lib/system-bots');
+    const nitDef = SYSTEM_BOTS.find(b => b.style === 'nit')!;
+    const agent = new BuiltinBotAgent('test-user', nitDef);
+
+    agent.notify({
+      type: 'new_hand',
+      handId: 'test-nit-bb',
+      seat: 5,
+      stack: 1500,
+      players: [
+        { seat: 0, playerId: 'p0', displayName: 'P0', stack: 8000, isBot: true },
+        { seat: 1, playerId: 'p1', displayName: 'P1', stack: 8000, isBot: true },
+        { seat: 2, playerId: 'p2', displayName: 'P2', stack: 8000, isBot: true },
+        { seat: 3, playerId: 'p3', displayName: 'P3', stack: 8000, isBot: true },
+        { seat: 4, playerId: 'p4', displayName: 'P4', stack: 9377, isBot: true },
+        { seat: 5, playerId: 'hero', displayName: 'Hero', stack: 1500, isBot: true },
+        { seat: 6, playerId: 'p6', displayName: 'P6', stack: 16956, isBot: true },
+        { seat: 7, playerId: 'p7', displayName: 'P7', stack: 8000, isBot: true },
+        { seat: 8, playerId: 'p8', displayName: 'P8', stack: 8000, isBot: true },
+      ],
+      smallBlind: 50,
+      bigBlind: 100,
+      buttonSeat: 3,
+    });
+    agent.notify({ type: 'hole_cards', cards: ['Qh', '9d'] });
+
+    const result = await agent.requestAction({
+      street: 'preflop',
+      board: [],
+      pot: 200,
+      currentBet: 237,
+      toCall: 137,
+      minRaise: 137,
+      stack: 1500,
+      initialStack: 1500,
+      history: [{ seat: 4, action: 'raise', amount: 237 }],
+    });
+
+    expect(result.action).toBe('call');
+    expect(result.debug?.reasoning).toContain('preflop BB');
   });
 });
 

@@ -4,6 +4,7 @@ import {
   BuiltinBotAgent,
   STYLE_CONFIG_FOR_TEST,
   chooseBuiltinActionForTest,
+  choosePushFoldForTest,
   computePersonalityThinkTime,
   resolveAdaptivePersonality,
 } from '../agents';
@@ -24,6 +25,48 @@ afterEach(() => {
 });
 
 describe('heuristic personality lines', () => {
+  it('shortstack can jam a defendable suited gapper instead of auto-folding ultra-short in the big blind', () => {
+    const action = choosePushFoldForTest(
+      ['8h', '6h'],
+      4.18,
+      {
+        street: 'preflop',
+        board: [],
+        pot: 200,
+        currentBet: 237,
+        toCall: 137,
+        minRaise: 137,
+        stack: 318,
+        history: [{ seat: 4, action: 'raise', amount: 237 }],
+      },
+      9,
+      'BB',
+    );
+
+    expect(action.action).toBe('allin');
+  });
+
+  it('shortstack still folds pure trash in the same ultra-short blind defense spot', () => {
+    const action = choosePushFoldForTest(
+      ['7h', '2d'],
+      4.18,
+      {
+        street: 'preflop',
+        board: [],
+        pot: 200,
+        currentBet: 237,
+        toCall: 137,
+        minRaise: 137,
+        stack: 318,
+        history: [{ seat: 4, action: 'raise', amount: 237 }],
+      },
+      9,
+      'BB',
+    );
+
+    expect(action.action).toBe('fold');
+  });
+
   it('trapper can slowplay below the old nuts-only gate', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
 
@@ -429,6 +472,45 @@ describe('adaptive mirroring', () => {
     expect(action.debug?.reasoning).toContain('变色龙→张飞');
     expect(action.debug?.thinkMs).toBeTypeOf('number');
     expect(action.debug?.thinkMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('shortstack mode threshold', () => {
+  it('15BB shortstack no longer forces the hard push-fold branch', async () => {
+    const def = SYSTEM_BOTS.find(bot => bot.style === 'shortstack')!;
+    const agent = new BuiltinBotAgent(def.userId, def);
+
+    agent.notify({
+      type: 'new_hand',
+      handId: 'shortstack-15bb',
+      seat: 0,
+      stack: 300,
+      players: [
+        { seat: 0, playerId: 'p0', displayName: 'P0', stack: 300, isBot: true },
+        { seat: 1, playerId: 'p1', displayName: 'P1', stack: 300, isBot: true },
+        { seat: 2, playerId: 'p2', displayName: 'P2', stack: 300, isBot: true },
+        { seat: 3, playerId: 'p3', displayName: 'P3', stack: 300, isBot: true },
+        { seat: 4, playerId: 'p4', displayName: 'P4', stack: 300, isBot: true },
+        { seat: 5, playerId: 'p5', displayName: 'P5', stack: 300, isBot: true },
+      ],
+      smallBlind: 10,
+      bigBlind: 20,
+      buttonSeat: 4,
+    });
+    agent.notify({ type: 'hole_cards', cards: ['Qh', '9d'] });
+
+    const action = await agent.requestAction({
+      street: 'preflop',
+      board: [],
+      pot: 30,
+      currentBet: 20,
+      toCall: 10,
+      minRaise: 20,
+      stack: 300,
+      history: [],
+    });
+
+    expect(action.debug?.reasoning).not.toContain('短码模式');
   });
 });
 
