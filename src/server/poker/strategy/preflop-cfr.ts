@@ -403,11 +403,10 @@ export function getPreflopActionCFR(
 
   // (b) Garbage override: prevent style deviation raiseShift from inflating
   //     true garbage hands into opens or calls.
-  //     selectAction() picks the dominant action, but frequency-based
-  //     randomization in agents.ts can still roll into the minority raise
-  //     bucket (e.g. shortstack raiseShift +0.12 gives 42o ~17% raise).
-  //     Use a stricter GTO fold threshold for unopened (only catch extreme
-  //     garbage), looser for facing action (standard sanity cap).
+  //     When GTO says a hand is garbage, return PURE fold without frequencies.
+  //     This blocks agents.ts frequency randomization from rolling into the
+  //     minority raise bucket (e.g. shortstack raiseShift +0.12 gives 42o ~17% raise,
+  //     and even if selectAction picks fold, the frequencies carry raise probability).
   {
     const isUnopened = actionSeq === 'unopened';
     const garbageThreshold = isUnopened
@@ -417,8 +416,10 @@ export function getPreflopActionCFR(
       // Facing action: existing thresholds
       : (style === 'station' ? 1.01 : style === 'maniac' ? 0.965 : 0.96);
 
-    if (gto.fold > garbageThreshold && result.action !== 'fold') {
-      return { action: 'fold', frequency: gto.fold };
+    if (gto.fold > garbageThreshold) {
+      // Pure fold — no frequencies object, so agents.ts uses the binary
+      // fallback branch which can only produce fold/check, never raise.
+      return { action: 'fold', frequency: 1.0 };
     }
   }
 
@@ -433,8 +434,10 @@ export function getPreflopActionCFR(
     // Station still folds against 4bet+ (even 猪八戒 isn't THAT loose)
     // Maniac folds some garbage against 3bet
     const foldBar = style === 'station' ? 0.70 : style === 'maniac' ? 0.80 : 0.40;
-    if (gto.fold > foldBar && result.action !== 'fold') {
-      return { action: 'fold', frequency: gto.fold };
+    if (gto.fold > foldBar) {
+      // Pure fold without frequencies — agents.ts pot-odds floor will
+      // convert to call when price is trivial, but never to raise.
+      return { action: 'fold', frequency: 1.0 };
     }
   }
 

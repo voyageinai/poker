@@ -436,3 +436,128 @@ describe('Personality differentiation', () => {
     expect(trapperCheck, `trapper check rate with set: ${Math.round(trapperCheck * 100)}%`).toBeGreaterThan(lagCheck);
   }, 30000);
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 7. Pot-Odds Floor — never fold when getting absurd odds
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Pot-odds floor: no folding at trivial prices', () => {
+  const ALL_STYLES: SystemBotStyle[] = ['nit', 'tag', 'lag', 'station', 'maniac', 'trapper', 'bully', 'tilter', 'shortstack', 'adaptive', 'gto'];
+
+  // Scenario: 6 players called 40, human min-3bets to 60.
+  // Bot already invested 40 and only needs 20 more into a 310 pot.
+  // potOdds = 20 / 330 ≈ 0.06. Nobody should fold here.
+  const min3betAfterFlat = {
+    street: 'preflop' as const,
+    board: [] as Card[],
+    pot: 310,
+    currentBet: 60,
+    toCall: 20,
+    minRaise: 40,
+    stack: 960,
+    history: [
+      { seat: 3, action: 'raise' as ActionType, amount: 40 },
+      { seat: 4, action: 'call' as ActionType, amount: 40 },
+      { seat: 5, action: 'call' as ActionType, amount: 40 },
+      { seat: 0, action: 'call' as ActionType, amount: 40 },
+      { seat: 1, action: 'raise' as ActionType, amount: 60 },
+    ],
+  };
+
+  it('no style folds 99 to a min-3bet after already calling (15:1 odds)', async () => {
+    for (const style of ALL_STYLES) {
+      const stats = await collectActions(style, ['9d', '9h'], min3betAfterFlat, {
+        seat: 0, buttonSeat: 5, trials: 100,
+      });
+      const foldRate = stats.fold / stats.total;
+      expect(foldRate, `${style} folding 99 at 15:1 odds: ${Math.round(foldRate * 100)}%`).toBe(0);
+    }
+  }, 60000);
+
+  it('no style folds KhJc to a min-3bet after already calling', async () => {
+    for (const style of ALL_STYLES) {
+      const stats = await collectActions(style, ['Kh', 'Jc'], min3betAfterFlat, {
+        seat: 0, buttonSeat: 5, trials: 100,
+      });
+      const foldRate = stats.fold / stats.total;
+      expect(foldRate, `${style} folding KJo at 15:1 odds: ${Math.round(foldRate * 100)}%`).toBe(0);
+    }
+  }, 60000);
+
+  it('even garbage hands (74o) call at 15:1 odds, never fold', async () => {
+    for (const style of ALL_STYLES) {
+      const stats = await collectActions(style, ['7d', '4h'], min3betAfterFlat, {
+        seat: 0, buttonSeat: 5, trials: 100,
+      });
+      const foldRate = stats.fold / stats.total;
+      expect(foldRate, `${style} folding 74o at 15:1 odds: ${Math.round(foldRate * 100)}%`).toBe(0);
+    }
+  }, 60000);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 8. Garbage Hand Sanity — junk should never open or 4-bet
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Garbage hand sanity: no opening or raising junk', () => {
+  const ALL_STYLES: SystemBotStyle[] = ['nit', 'tag', 'lag', 'station', 'maniac', 'trapper', 'bully', 'tilter', 'shortstack', 'adaptive', 'gto'];
+  // Styles that should NEVER open pure garbage (42o, 72o)
+  // Station/maniac intentionally play wide so they are exempt from the open test
+  const disciplinedStyles: SystemBotStyle[] = ['nit', 'tag', 'trapper', 'tilter', 'shortstack', 'adaptive', 'gto'];
+
+  // Unopened pot from MP (seat 2, button at seat 5 in 6-handed)
+  const unopenedMP = {
+    street: 'preflop' as const,
+    board: [] as Card[],
+    pot: 30,
+    currentBet: 20,
+    toCall: 0,
+    minRaise: 20,
+    stack: 1000,
+    history: [] as Array<{ seat: number; action: ActionType; amount: number }>,
+  };
+
+  const garbageHands: [string, string][] = [
+    ['4c', '2s'], ['7d', '2h'], ['3c', '2d'], ['5h', '2c'],
+  ];
+
+  it('disciplined styles never open 42o/72o/32o from MP', async () => {
+    for (const style of disciplinedStyles) {
+      for (const hand of garbageHands) {
+        const stats = await collectActions(style, hand, unopenedMP, {
+          seat: 2, buttonSeat: 5, playerCount: 6, trials: 100,
+        });
+        const raiseRate = (stats.raise + stats.allin) / stats.total;
+        expect(raiseRate, `${style} opening ${hand.join('')} from MP: ${Math.round(raiseRate * 100)}%`).toBe(0);
+      }
+    }
+  }, 120000);
+
+  // After facing a min-3bet with trivial pot odds, garbage hands should call, NOT raise.
+  // This catches the regression where style raiseShift inflated 42o into a 4-bet.
+  const min3betCheap = {
+    street: 'preflop' as const,
+    board: [] as Card[],
+    pot: 310,
+    currentBet: 60,
+    toCall: 20,
+    minRaise: 40,
+    stack: 960,
+    history: [
+      { seat: 0, action: 'raise' as ActionType, amount: 40 },
+      { seat: 1, action: 'call' as ActionType, amount: 40 },
+      { seat: 2, action: 'call' as ActionType, amount: 40 },
+      { seat: 3, action: 'raise' as ActionType, amount: 60 },
+    ],
+  };
+
+  it('no style 4-bets garbage hands even at trivial pot odds', async () => {
+    for (const style of ALL_STYLES) {
+      const stats = await collectActions(style, ['4c', '2s'], min3betCheap, {
+        seat: 0, buttonSeat: 5, trials: 100,
+      });
+      const raiseRate = (stats.raise + stats.allin) / stats.total;
+      expect(raiseRate, `${style} 4-betting 42o: ${Math.round(raiseRate * 100)}%`).toBe(0);
+    }
+  }, 60000);
+});

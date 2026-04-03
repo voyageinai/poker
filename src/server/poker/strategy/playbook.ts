@@ -94,7 +94,7 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
       trigger: { streets: ['preflop'], facingAction: 'raise' },
       action: { type: 'raise', sizing: { mode: 'prev_bet_multiple', multiple: 3.5 } },
       frequency: 0.28,
-      strengthGate: null,
+      strengthGate: [0.12, 1.0],  // even maniac doesn't 3bet/4bet absolute garbage (42o=0.08, 72o=0.077)
     },
     {
       name: 'donk_bomb',
@@ -232,7 +232,7 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
       },
       action: { type: 'raise', sizing: { mode: 'prev_bet_multiple', multiple: 3.5 } },
       frequency: 0.30,
-      strengthGate: null,
+      strengthGate: [0.10, 1.0],  // bully still steals wide but not with absolute garbage
     },
     {
       name: 'river_bully',
