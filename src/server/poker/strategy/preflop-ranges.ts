@@ -43,17 +43,18 @@ const POSITION_RFI: Record<Position, number> = {
 };
 
 const STYLE_MODIFIERS: Record<SystemBotStyle, StyleRangeModifier> = {
-  nit:        { rfiShift: -0.15, premiumBoost: 0.05,  suitedBonus: 0.00, speculative: -0.05 },
-  tag:        { rfiShift:  0.02, premiumBoost: 0.03,  suitedBonus: 0.03, speculative: 0.02 },
-  lag:        { rfiShift:  0.12, premiumBoost: 0.00,  suitedBonus: 0.04, speculative: 0.20 },
-  station:    { rfiShift:  0.18, premiumBoost: -0.10, suitedBonus: 0.02, speculative: 0.05 },
-  maniac:     { rfiShift:  0.25, premiumBoost: -0.05, suitedBonus: 0.03, speculative: 0.15 },
-  trapper:    { rfiShift:  0.05, premiumBoost: 0.05,  suitedBonus: 0.03, speculative: 0.08 },
-  bully:      { rfiShift:  0.05, premiumBoost: 0.00,  suitedBonus: 0.01, speculative: 0.02 },
-  tilter:     { rfiShift:  0.02, premiumBoost: 0.00,  suitedBonus: 0.01, speculative: 0.01 },
-  shortstack: { rfiShift: -0.02, premiumBoost: 0.08,  suitedBonus: -0.02, speculative: -0.08 },
-  adaptive:   { rfiShift:  0.04, premiumBoost: 0.02,  suitedBonus: 0.03, speculative: 0.05 },
-  gto:        { rfiShift:  0.00, premiumBoost: 0.02,  suitedBonus: 0.02, speculative: 0.02 },
+  // v3: widened ranges across the board — less preflop folding, more action
+  nit:        { rfiShift: -0.06, premiumBoost: 0.05,  suitedBonus: 0.02, speculative: -0.02 },
+  tag:        { rfiShift:  0.08, premiumBoost: 0.03,  suitedBonus: 0.04, speculative: 0.06 },
+  lag:        { rfiShift:  0.16, premiumBoost: 0.00,  suitedBonus: 0.05, speculative: 0.22 },
+  station:    { rfiShift:  0.22, premiumBoost: -0.10, suitedBonus: 0.03, speculative: 0.08 },
+  maniac:     { rfiShift:  0.28, premiumBoost: -0.05, suitedBonus: 0.04, speculative: 0.18 },
+  trapper:    { rfiShift:  0.10, premiumBoost: 0.05,  suitedBonus: 0.04, speculative: 0.12 },
+  bully:      { rfiShift:  0.10, premiumBoost: 0.00,  suitedBonus: 0.02, speculative: 0.06 },
+  tilter:     { rfiShift:  0.08, premiumBoost: 0.00,  suitedBonus: 0.02, speculative: 0.05 },
+  shortstack: { rfiShift:  0.04, premiumBoost: 0.08,  suitedBonus: 0.00, speculative: -0.04 },
+  adaptive:   { rfiShift:  0.10, premiumBoost: 0.02,  suitedBonus: 0.04, speculative: 0.08 },
+  gto:        { rfiShift:  0.06, premiumBoost: 0.02,  suitedBonus: 0.03, speculative: 0.05 },
 };
 
 const DEFENSE_PROFILES: Partial<Record<SystemBotStyle, DefenseProfile>> = {
@@ -257,9 +258,10 @@ export function getPreflopAction(
   // Uses logarithmic scaling so 3-bets (6BB) still penalize junk, but all-ins (50BB)
   // don't nuke premium hands into negative territory.
   // At 6BB: log2(5)=2.32 → TAG penalty ~0.14.  At 50BB: log2(49)=5.61 → TAG penalty ~0.34.
+  // v3: reduced commit penalties — bots less scared of calling 3bets
   const commitPenaltyCoeff: Record<SystemBotStyle, number> = {
-    nit: 0.08, tag: 0.06, lag: 0.04, station: 0.025, maniac: 0.02,
-    trapper: 0.05, bully: 0.04, tilter: 0.04, shortstack: 0.06, adaptive: 0.05, gto: 0.05,
+    nit: 0.06, tag: 0.04, lag: 0.03, station: 0.02, maniac: 0.015,
+    trapper: 0.035, bully: 0.03, tilter: 0.03, shortstack: 0.04, adaptive: 0.035, gto: 0.04,
   };
   if (context.toCallBB && context.toCallBB > 2) {
     const excessBB = context.toCallBB - 2;
@@ -285,18 +287,19 @@ export function getPreflopAction(
   const rfiThreshold = Math.max(0.06, POSITION_RFI[position] - mod.rfiShift);
 
   // Call zone width varies by style
+  // v3: widened call zones — even "tight" bots see more flops
   const callZoneWidth: Record<SystemBotStyle, number> = {
-    nit:        0.04,
-    tag:        0.10,
-    lag:        0.10,
-    station:    0.22,
-    maniac:     0.12,
-    trapper:    0.16,
-    bully:      0.10,
-    tilter:     0.10,
-    shortstack: 0.08,
-    adaptive:   0.14,
-    gto:        0.06,
+    nit:        0.10,
+    tag:        0.14,
+    lag:        0.14,
+    station:    0.26,
+    maniac:     0.16,
+    trapper:    0.20,
+    bully:      0.14,
+    tilter:     0.14,
+    shortstack: 0.12,
+    adaptive:   0.18,
+    gto:        0.12,
   };
   const defendBonus = canDefend
     ? defenseProfile.callBonus * defensePositionMult * defensePriceMult

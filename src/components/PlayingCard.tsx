@@ -7,10 +7,10 @@ const SUIT_SYMBOLS: Record<Suit, string> = { h: '♥', d: '♦', c: '♣', s: '�
 const RED_SUITS = new Set<Suit>(['h', 'd']);
 
 const SUIT_GLOW: Record<Suit, string> = {
-  h: '0 0 12px rgba(239,68,68,0.4)',
-  d: '0 0 12px rgba(239,68,68,0.4)',
-  c: '0 0 12px rgba(226,234,243,0.2)',
-  s: '0 0 12px rgba(226,234,243,0.2)',
+  h: '0 0 12px rgba(220,38,38,0.4)',
+  d: '0 0 12px rgba(220,38,38,0.4)',
+  c: '0 0 12px rgba(240,232,218,0.2)',
+  s: '0 0 12px rgba(240,232,218,0.2)',
 };
 
 interface Props {
@@ -38,34 +38,34 @@ const WATERMARK_SIZES = {
   xl: 'text-[3.8rem]',
 } as const;
 
-/** Card back with branded crosshatch pattern */
+/** Card back — crimson with gold geometric pattern */
 function CardBack({ sizeClass, className, style }: { sizeClass: string; className?: string; style?: React.CSSProperties }) {
   return (
     <div
       className={cn(
         sizeClass,
         'relative inline-flex items-center justify-center overflow-hidden rounded-md',
-        'border border-teal-dim',
-        'shadow-[0_2px_8px_rgba(0,0,0,0.5)]',
+        'border border-gold-dim/60',
+        'shadow-[0_2px_8px_rgba(0,0,0,0.6)]',
         'transition-transform duration-150 hover:-translate-y-0.5',
         className,
       )}
       style={{
         background: `
-          repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,119,168,0.12) 4px, rgba(0,119,168,0.12) 5px),
-          repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(0,119,168,0.12) 4px, rgba(0,119,168,0.12) 5px),
-          linear-gradient(135deg, #0d2a44 0%, #1a3a5c 100%)
+          repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(212,165,116,0.08) 4px, rgba(212,165,116,0.08) 5px),
+          repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(212,165,116,0.08) 4px, rgba(212,165,116,0.08) 5px),
+          linear-gradient(135deg, #2a0e0e 0%, #180808 100%)
         `,
         ...style,
       }}
     >
-      {/* Center brand diamond */}
-      <div className="text-teal-dim/40 font-mono text-[0.7rem] font-black">◆</div>
+      {/* Center gold seal mark */}
+      <div className="text-gold-dim/40 font-heading text-[0.7rem] font-black">◆</div>
     </div>
   );
 }
 
-/** Card face with dark theme + suit watermark */
+/** Card face with warm dark theme + suit watermark */
 function CardFace({ card, sizeClass, watermarkSize, className, style }: {
   card: Card; sizeClass: string; watermarkSize: string; className?: string; style?: React.CSSProperties;
 }) {
@@ -81,12 +81,12 @@ function CardFace({ card, sizeClass, watermarkSize, className, style }: {
         'relative inline-flex flex-col items-start justify-between overflow-hidden rounded-md',
         'font-mono font-bold select-none',
         'edge-light',
-        red ? 'text-[#ff5555]' : 'text-[#e8f0f8]',
+        red ? 'text-[#dc2626]' : 'text-[#f0e8da]',
         className,
       )}
       style={{
-        background: 'linear-gradient(135deg, #1e2d42 0%, #141f30 100%)',
-        border: `1px solid ${red ? 'rgba(239,68,68,0.2)' : 'rgba(200,214,229,0.12)'}`,
+        background: 'linear-gradient(135deg, #2a2018 0%, #1e1610 100%)',
+        border: `1px solid ${red ? 'rgba(220,38,38,0.2)' : 'rgba(212,165,116,0.12)'}`,
         padding: '0.15rem 0.25rem',
         ...style,
       }}
@@ -94,7 +94,7 @@ function CardFace({ card, sizeClass, watermarkSize, className, style }: {
       {/* Suit watermark */}
       <div className={cn(
         'pointer-events-none absolute inset-0 flex items-center justify-center',
-        watermarkSize, 'opacity-[0.12]',
+        watermarkSize, 'opacity-[0.1]',
       )}>
         {symbol}
       </div>
@@ -134,7 +134,7 @@ export default function PlayingCard({ card, faceDown = false, size = 'md', anima
           >
             <motion.div
               initial={{ boxShadow: suit ? SUIT_GLOW[suit] : 'none' }}
-              animate={{ boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}
+              animate={{ boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
               transition={{ duration: 0.6 }}
               className="rounded-md"
             >

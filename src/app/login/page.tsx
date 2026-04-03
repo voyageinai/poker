@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { withBasePath } from '@/lib/runtime-config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import Logo from '@/components/Logo';
 import { cn } from '@/lib/utils';
 
@@ -44,43 +43,45 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-[80vh] items-center justify-center">
-      {/* Animated grid background */}
+      {/* Diagonal line pattern background */}
       <div
-        className="fixed inset-0 -z-10"
+        className="fixed inset-0 -z-10 opacity-[0.03]"
         style={{
           backgroundImage:
-            'linear-gradient(rgba(0,180,216,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,180,216,0.03) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-          animation: 'rim-shimmer 20s linear infinite',
+            'repeating-linear-gradient(45deg, var(--gold-dim) 0px, var(--gold-dim) 1px, transparent 1px, transparent 40px)',
         }}
       />
 
-      {/* Radial glow centered on the card */}
+      {/* Crimson radial glow */}
       <div
         className="fixed inset-0 -z-10 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(0,180,216,0.05), transparent 70%)',
+          background: 'radial-gradient(ellipse 60% 50% at center, rgba(220,38,38,0.06), transparent 70%)',
         }}
       />
 
-      <Card className="edge-light w-full max-w-[400px] border-[var(--border)] bg-bg-surface p-5 md:p-8 mx-2 md:mx-0">
-        <CardContent className="p-0">
+      <div className="w-full max-w-[420px] mx-3 md:mx-0">
+        {/* Gold top accent */}
+        <div className="h-[2px] rounded-t-xl bg-gradient-to-r from-transparent via-gold-dim to-transparent" />
+
+        <div className="rounded-b-xl bg-bg-surface border border-[var(--border)] border-t-0 p-6 md:p-8 shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
           {/* Logo */}
-          <div className="mb-6 text-center">
+          <div className="mb-8 text-center">
             <Logo size="lg" />
+            <p className="mt-2 text-xs text-text-muted tracking-wider">德州扑克竞技场</p>
           </div>
 
-          {/* Tabs — underline style */}
-          <div className="mb-6 flex gap-0 border-b border-[var(--border)]">
+          {/* Tabs — pill style */}
+          <div className="mb-6 flex gap-1 rounded-lg bg-bg-base p-1">
             {(['login', 'register'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={cn(
-                  'flex-1 cursor-pointer border-none bg-transparent py-2 text-sm transition-all',
+                  'flex-1 cursor-pointer border-none rounded-md py-2 text-sm font-medium transition-all',
                   tab === t
-                    ? 'border-b-2 border-teal font-semibold text-teal -mb-px'
-                    : 'font-normal text-text-secondary hover:text-text-primary'
+                    ? 'bg-bg-card text-text-primary shadow-sm'
+                    : 'bg-transparent text-text-muted hover:text-text-secondary'
                 )}
               >
                 {TAB_LABELS[t]}
@@ -88,38 +89,40 @@ export default function LoginPage() {
             ))}
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="mb-1 block text-xs text-text-muted">用户名</label>
-              <Input value={username} onChange={e => setUsername(e.target.value)} required autoComplete="username" />
+              <label className="mb-1.5 block text-xs text-text-muted font-medium tracking-wide">用户名</label>
+              <Input value={username} onChange={e => setUsername(e.target.value)} required autoComplete="username" className="h-10" />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-text-muted">密码</label>
+              <label className="mb-1.5 block text-xs text-text-muted font-medium tracking-wide">密码</label>
               <Input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
                 autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                className="h-10"
               />
             </div>
             {tab === 'register' && (
               <div>
-                <label className="mb-1 block text-xs text-text-muted">邀请码</label>
+                <label className="mb-1.5 block text-xs text-text-muted font-medium tracking-wide">邀请码</label>
                 <Input
                   value={inviteCode}
                   onChange={e => setInviteCode(e.target.value)}
                   placeholder="注册需要邀请码"
+                  className="h-10"
                 />
               </div>
             )}
-            {error && <div className="text-sm text-loss">{error}</div>}
-            <Button type="submit" disabled={loading} variant="teal" className="mt-1">
+            {error && <div className="text-sm text-loss bg-loss/8 rounded-md px-3 py-2">{error}</div>}
+            <Button type="submit" disabled={loading} variant="teal" className="mt-1 h-11 text-base font-bold tracking-wider">
               {loading ? '...' : TAB_LABELS[tab]}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

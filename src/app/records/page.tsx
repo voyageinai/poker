@@ -110,21 +110,23 @@ export default function RecordsPage() {
 
   return (
     <div className="py-4 md:py-6">
-      <h1 className="mb-5 text-xl font-bold text-text-primary">
-        <span className="glow-text-teal">战</span>绩
+      {/* Page header */}
+      <h1 className="font-heading mb-1 text-2xl font-bold text-text-primary tracking-wide">
+        <span className="glow-text-gold">战</span>绩
       </h1>
+      <div className="gold-divider mb-5" />
 
-      {/* Tabs */}
-      <div className="mb-5 flex gap-0 border-b border-[var(--border)]">
+      {/* Pill-style tab switcher */}
+      <div className="mb-5 rounded-lg bg-bg-base p-1 flex gap-1 w-fit">
         {(Object.keys(TAB_LABELS) as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn(
-              'cursor-pointer border-none bg-transparent px-4 py-2 text-sm transition-all',
+              'cursor-pointer border-none px-5 py-1.5 text-sm font-medium transition-all rounded-md',
               tab === t
-                ? 'border-b-2 border-teal font-semibold text-teal -mb-px'
-                : 'font-normal text-text-secondary hover:text-text-primary',
+                ? 'bg-bg-card text-text-primary shadow-sm'
+                : 'bg-transparent text-text-muted hover:text-text-secondary',
             )}
           >
             {TAB_LABELS[t]}
@@ -167,13 +169,28 @@ function HandsTab() {
       {/* Stats summary */}
       {stats && (
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="总局数" value={stats.total_hands.toLocaleString()} />
-          <StatCard label="胜局" value={stats.win_count.toLocaleString()} color="text-win" />
-          <StatCard label="负局" value={stats.loss_count.toLocaleString()} color="text-loss" />
+          <StatCard
+            label="总局数"
+            value={stats.total_hands.toLocaleString()}
+            accent="gold"
+          />
+          <StatCard
+            label="胜局"
+            value={stats.win_count.toLocaleString()}
+            color="text-win"
+            accent="win"
+          />
+          <StatCard
+            label="负局"
+            value={stats.loss_count.toLocaleString()}
+            color="text-loss"
+            accent="loss"
+          />
           <StatCard
             label="总盈亏"
             value={`${stats.total_profit >= 0 ? '+' : ''}${stats.total_profit.toLocaleString()}`}
             color={stats.total_profit >= 0 ? 'text-win' : 'text-loss'}
+            accent={stats.total_profit >= 0 ? 'win' : 'loss'}
           />
         </div>
       )}
@@ -188,28 +205,61 @@ function HandsTab() {
           {rows.map(r => {
             const profit = r.stack_end !== null ? r.stack_end - r.stack_start : null;
             const holeCards: [CardType, CardType] | null = r.hole_cards ? JSON.parse(r.hole_cards) : null;
+            const isWin = profit !== null && profit > 0;
             return (
               <Link
                 key={r.id}
                 href={`/hand/${r.id}`}
-                className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-bg-surface px-4 py-3 no-underline transition-colors hover:bg-bg-hover"
+                className={cn(
+                  'flex items-center gap-3 rounded-lg border bg-bg-surface px-4 py-3 no-underline',
+                  'transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md hover:bg-bg-hover',
+                  isWin
+                    ? 'border-l-2 border-l-[var(--color-gold)] border-[var(--border)]'
+                    : 'border-[var(--border)]',
+                )}
               >
-                {/* Hole cards */}
-                <div className="flex shrink-0">
+                {/* Hole cards with fan effect */}
+                <div className="flex shrink-0 items-center" style={{ width: isMobile ? 42 : 54 }}>
                   {holeCards ? (
-                    <>
-                      <PlayingCard card={holeCards[0]} size="xs" />
-                      <div style={{ marginLeft: '-4px' }}>
-                        <PlayingCard card={holeCards[1]} size="xs" />
-                      </div>
-                    </>
+                    <div className="relative" style={{ width: isMobile ? 42 : 54, height: isMobile ? 36 : 46 }}>
+                      <span
+                        className="absolute top-0 left-0"
+                        style={{ transform: 'rotate(-3deg)', transformOrigin: 'bottom center', zIndex: 1 }}
+                      >
+                        <PlayingCard card={holeCards[0]} size={isMobile ? 'xs' : 'sm'} />
+                      </span>
+                      <span
+                        className="absolute top-0"
+                        style={{
+                          left: isMobile ? 10 : 12,
+                          transform: 'rotate(3deg)',
+                          transformOrigin: 'bottom center',
+                          zIndex: 2,
+                        }}
+                      >
+                        <PlayingCard card={holeCards[1]} size={isMobile ? 'xs' : 'sm'} />
+                      </span>
+                    </div>
                   ) : (
-                    <>
-                      <PlayingCard faceDown size="xs" />
-                      <div style={{ marginLeft: '-4px' }}>
-                        <PlayingCard faceDown size="xs" />
-                      </div>
-                    </>
+                    <div className="relative" style={{ width: isMobile ? 42 : 54, height: isMobile ? 36 : 46 }}>
+                      <span
+                        className="absolute top-0 left-0"
+                        style={{ transform: 'rotate(-3deg)', transformOrigin: 'bottom center', zIndex: 1 }}
+                      >
+                        <PlayingCard faceDown size={isMobile ? 'xs' : 'sm'} />
+                      </span>
+                      <span
+                        className="absolute top-0"
+                        style={{
+                          left: isMobile ? 10 : 12,
+                          transform: 'rotate(3deg)',
+                          transformOrigin: 'bottom center',
+                          zIndex: 2,
+                        }}
+                      >
+                        <PlayingCard faceDown size={isMobile ? 'xs' : 'sm'} />
+                      </span>
+                    </div>
                   )}
                 </div>
 
@@ -217,20 +267,24 @@ function HandsTab() {
                   /* Mobile: two-line layout */
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-text-primary">第 {r.hand_number} 局</span>
+                      <span className="text-sm text-text-primary font-medium">第 {r.hand_number} 局</span>
                       <span className="text-xs text-text-muted truncate flex-1">{r.table_name}</span>
                       {profit !== null && (
                         <span className={cn(
-                          'mono text-sm font-bold whitespace-nowrap shrink-0',
-                          profit > 0 ? 'text-win' : profit < 0 ? 'text-loss' : 'text-text-muted',
+                          'mono text-xs font-bold whitespace-nowrap shrink-0 rounded-full px-2.5 py-0.5',
+                          profit > 0
+                            ? 'bg-win/10 text-win'
+                            : profit < 0
+                              ? 'bg-loss/10 text-loss'
+                              : 'text-text-muted bg-bg-base',
                         )}>
                           {profit > 0 ? '+' : ''}{profit.toLocaleString()}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center justify-between mt-0.5">
+                    <div className="flex items-center justify-between mt-1">
                       <span className="text-xs text-text-muted">
-                        底池 <span className="mono text-amber">{r.pot}</span>
+                        底池 <span className="mono text-amber">{r.pot.toLocaleString()}</span>
                       </span>
                       <span className="text-xs text-text-muted whitespace-nowrap">
                         {r.ended_at ? fmtTime(r.ended_at) : ''}
@@ -238,29 +292,36 @@ function HandsTab() {
                     </div>
                   </div>
                 ) : (
-                  /* Desktop: single-line layout */
-                  <>
+                  /* Desktop: two-line layout with better hierarchy */
+                  <div className="flex flex-1 min-w-0 items-center gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-text-primary">第 {r.hand_number} 局</span>
+                        <span className="text-sm font-medium text-text-primary">第 {r.hand_number} 局</span>
+                        <span className="text-xs text-text-muted">·</span>
                         <span className="text-xs text-text-muted truncate">{r.table_name}</span>
                       </div>
-                      <div className="mt-0.5 text-xs text-text-muted">
-                        底池 <span className="mono text-amber">{r.pot}</span>
+                      <div className="mt-0.5 flex items-center gap-3">
+                        <span className="text-xs text-text-muted">
+                          底池 <span className="mono text-amber">{r.pot.toLocaleString()}</span>
+                        </span>
+                        <span className="text-xs text-text-muted whitespace-nowrap">
+                          {r.ended_at ? fmtTime(r.ended_at) : ''}
+                        </span>
                       </div>
                     </div>
                     {profit !== null && (
                       <span className={cn(
-                        'mono text-sm font-bold whitespace-nowrap',
-                        profit > 0 ? 'text-win' : profit < 0 ? 'text-loss' : 'text-text-muted',
+                        'mono text-sm font-bold whitespace-nowrap shrink-0 rounded-full px-2.5 py-0.5',
+                        profit > 0
+                          ? 'bg-win/10 text-win'
+                          : profit < 0
+                            ? 'bg-loss/10 text-loss'
+                            : 'text-text-muted bg-bg-base',
                       )}>
                         {profit > 0 ? '+' : ''}{profit.toLocaleString()}
                       </span>
                     )}
-                    <span className="text-xs text-text-muted whitespace-nowrap">
-                      {r.ended_at ? fmtTime(r.ended_at) : ''}
-                    </span>
-                  </>
+                  </div>
                 )}
               </Link>
             );
@@ -274,11 +335,30 @@ function HandsTab() {
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
+function StatCard({
+  label,
+  value,
+  color,
+  accent,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+  accent?: 'gold' | 'win' | 'loss';
+}) {
+  const borderAccent = {
+    gold: 'border-l-2 border-l-[var(--color-gold)]',
+    win: 'border-l-2 border-l-[var(--color-win)]',
+    loss: 'border-l-2 border-l-[var(--color-loss)]',
+  }[accent ?? 'gold'] ?? '';
+
   return (
-    <div className="rounded-lg border border-[var(--border)] bg-bg-surface px-4 py-3">
-      <div className="text-xs text-text-muted">{label}</div>
-      <div className={cn('mono text-lg font-bold', color ?? 'text-text-primary')}>{value}</div>
+    <div className={cn(
+      'rounded-lg border border-[var(--border)] bg-bg-surface px-4 py-3',
+      borderAccent,
+    )}>
+      <div className="text-xs text-text-muted mb-1">{label}</div>
+      <div className={cn('font-heading text-xl font-bold mono', color ?? 'text-text-primary')}>{value}</div>
     </div>
   );
 }
@@ -318,13 +398,23 @@ function LedgerTab() {
           {rows.map(r => {
             const delta = chipDelta(r.action, r.detail);
             const extra = summarize(r.detail);
+            const isDebit = DEBIT_ACTIONS.has(r.action);
             return (
               <div
                 key={r.id}
-                className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-bg-surface px-4 py-3"
+                className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-bg-surface px-4 py-3 transition-colors hover:bg-bg-hover"
               >
+                {/* Colored dot indicator */}
+                <span
+                  className={cn(
+                    'shrink-0 h-2 w-2 rounded-full',
+                    isDebit ? 'bg-loss' : 'bg-win',
+                  )}
+                  aria-hidden="true"
+                />
+
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm text-text-primary">
+                  <span className="text-sm font-medium text-text-primary">
                     {ACTION_LABELS[r.action] ?? r.action}
                   </span>
                   {extra && (
@@ -332,7 +422,10 @@ function LedgerTab() {
                   )}
                 </div>
                 {delta && (
-                  <span className={cn('mono text-sm font-bold whitespace-nowrap', delta.color)}>
+                  <span className={cn(
+                    'mono text-sm font-bold whitespace-nowrap shrink-0 rounded-full px-2.5 py-0.5',
+                    delta.color === 'text-win' ? 'bg-win/10 text-win' : 'bg-loss/10 text-loss',
+                  )}>
                     {delta.text}
                   </span>
                 )}
@@ -352,16 +445,48 @@ function LedgerTab() {
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
-function Pagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
+function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) {
   return (
-    <div className="mt-4 flex items-center justify-center gap-2">
-      <Button variant="ghost" size="xs" disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="h-11 px-4 md:h-auto md:px-2">
+    <div className="mt-5 flex items-center justify-center gap-3">
+      <button
+        disabled={page <= 1}
+        onClick={() => onPageChange(page - 1)}
+        className={cn(
+          'rounded-full px-4 py-1.5 text-sm font-medium transition-all border',
+          page <= 1
+            ? 'border-[var(--border)] text-text-muted cursor-not-allowed opacity-40'
+            : 'border-[var(--border)] text-text-secondary bg-bg-surface hover:bg-bg-hover hover:text-text-primary cursor-pointer',
+        )}
+        aria-label="上一页"
+      >
         上一页
-      </Button>
-      <span className="text-xs text-text-muted">{page} / {totalPages}</span>
-      <Button variant="ghost" size="xs" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="h-11 px-4 md:h-auto md:px-2">
+      </button>
+
+      <span className="rounded-full bg-bg-card border border-[var(--border)] px-3.5 py-1 text-xs font-semibold text-text-primary tabular-nums">
+        {page} / {totalPages}
+      </span>
+
+      <button
+        disabled={page >= totalPages}
+        onClick={() => onPageChange(page + 1)}
+        className={cn(
+          'rounded-full px-4 py-1.5 text-sm font-medium transition-all border',
+          page >= totalPages
+            ? 'border-[var(--border)] text-text-muted cursor-not-allowed opacity-40'
+            : 'border-[var(--border)] text-text-secondary bg-bg-surface hover:bg-bg-hover hover:text-text-primary cursor-pointer',
+        )}
+        aria-label="下一页"
+      >
         下一页
-      </Button>
+      </button>
     </div>
   );
 }

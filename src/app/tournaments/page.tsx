@@ -64,7 +64,7 @@ export default function TournamentsPage() {
     <div className="py-4 md:py-8">
       <div className="flex items-center justify-between mb-6 md:mb-8">
         <div>
-          <h1 className="m-0 text-xl md:text-2xl font-bold tracking-tight text-text-primary">锦标赛</h1>
+          <h1 className="m-0 text-xl md:text-2xl font-heading font-bold tracking-wider text-text-primary">锦标赛</h1>
           <p className="mt-1 text-sm text-text-secondary">
             SNG 赛制：报名满员后自动开赛。
           </p>

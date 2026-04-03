@@ -10,7 +10,7 @@ interface WinnerOverlayProps {
   compact?: boolean;
 }
 
-const CONFETTI_COLORS = ['var(--teal)', 'var(--amber)', 'var(--win)', '#ffffff'];
+const CONFETTI_COLORS = ['var(--crimson)', 'var(--gold)', 'var(--win)', '#f0e8da'];
 
 function randomBetween(min: number, max: number) {
   return Math.random() * (max - min) + min;

@@ -54,6 +54,8 @@ export interface PlayerAgent {
   requestAction(req: ActionRequest): Promise<PokerAction & { debug?: BotDebugInfo }>;
   /** Clean up resources (kill subprocess, close listeners) */
   dispose(): void;
+  /** v3: returns bluff cards if bot wants to show bluff after winning by fold */
+  getShowBluff?(): { cards: [Card, Card]; name: string } | null;
 }
 
 // ─── HumanAgent ───────────────────────────────────────────────────────────────
@@ -316,17 +318,20 @@ interface TimingProfile {
 }
 
 const STYLE_CONFIG: Record<SystemBotStyle, StyleParams> = {
-  nit:        { label: '司马懿', aggression: 0.28, looseness: 0.18, bluffRate: 0.01, raiseBias: 0.08, crowdSensitivity: 1.0,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3, preflopCommitCap: 0.25, lowSprJamMax: 1.35, lowSprJamStrength: 0.64, committedJamStrength: 0.42, raiseShoveCommit: 0.80, callThresholdShift: -0.01, peelMargin: 0.04, peelRate: 0.10 },
-  tag:        { label: '赵云',   aggression: 0.52, looseness: 0.42, bluffRate: 0.04, raiseBias: 0.18, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.05, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7, preflopCommitCap: 0.25, lowSprJamMax: 1.65, lowSprJamStrength: 0.56, committedJamStrength: 0.34, raiseShoveCommit: 0.68, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.20 },
-  lag:        { label: '孙悟空', aggression: 0.72, looseness: 0.65, bluffRate: 0.08, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0,    checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.7, preflopCommitCap: 0.35, lowSprJamMax: 2.10, lowSprJamStrength: 0.45, committedJamStrength: 0.24, raiseShoveCommit: 0.56, callThresholdShift: -0.015, peelMargin: 0.08, peelRate: 0.18 },
-  station:    { label: '猪八戒', aggression: 0.16, looseness: 0.72, bluffRate: 0,    raiseBias: 0.04, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.58, committedJamStrength: 0.46, raiseShoveCommit: 0.82, callThresholdShift: -0.04, peelMargin: 0.12, peelRate: 0.30 },
-  maniac:     { label: '张飞',   aggression: 0.88, looseness: 0.82, bluffRate: 0.18, raiseBias: 0.45, crowdSensitivity: 0.2,  slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.1, exploitWeight: 0.3, preflopCommitCap: 0.50, lowSprJamMax: 2.80, lowSprJamStrength: 0.30, committedJamStrength: 0.14, raiseShoveCommit: 0.42, callThresholdShift: -0.03, peelMargin: 0.10, peelRate: 0.22 },
-  trapper:    { label: '王熙凤', aggression: 0.42, looseness: 0.48, bluffRate: 0.03, raiseBias: 0.18, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.36, raiseShoveCommit: 0.78, callThresholdShift: -0.045, peelMargin: 0.12, peelRate: 0.34 },
-  bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5, preflopCommitCap: 0.30, lowSprJamMax: 2.20, lowSprJamStrength: 0.38, committedJamStrength: 0.20, raiseShoveCommit: 0.50, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.16 },
-  tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.25, lowSprJamMax: 2.10, lowSprJamStrength: 0.42, committedJamStrength: 0.22, raiseShoveCommit: 0.54, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.18 },
-  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.44, bluffRate: 0.05, raiseBias: 0.22, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25, lowSprJamMax: 3.00, lowSprJamStrength: 0.24, committedJamStrength: 0.10, raiseShoveCommit: 0.36, callThresholdShift: -0.025, peelMargin: 0.06, peelRate: 0.14 },
-  adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.25, lowSprJamMax: 1.90, lowSprJamStrength: 0.50, committedJamStrength: 0.28, raiseShoveCommit: 0.64, callThresholdShift: -0.025, peelMargin: 0.08, peelRate: 0.22 },
-  gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.38, raiseShoveCommit: 0.72, callThresholdShift: -0.03, peelMargin: 0.09, peelRate: 0.24 },
+  // v3.3: fix all-in every hand + add slow-play/check-raise
+  // Key changes: raise jam thresholds, lower raiseBias, boost slowplayRate/checkRaiseRate,
+  // tighten preflopCommitCap so preflop doesn't escalate to shoves
+  nit:        { label: '司马懿', aggression: 0.30, looseness: 0.30, bluffRate: 0.04, raiseBias: 0.10, crowdSensitivity: 0.8,  slowplayRate: 0.25, checkRaiseRate: 0.10, positionSensitivity: 0.5, sizingSensitivity: 0.8, patternSensitivity: 0.6, exploitWeight: 0.3, preflopCommitCap: 0.18, lowSprJamMax: 1.20, lowSprJamStrength: 0.72, committedJamStrength: 0.50, raiseShoveCommit: 0.85, callThresholdShift: -0.03, peelMargin: 0.08, peelRate: 0.22 },
+  tag:        { label: '赵云',   aggression: 0.52, looseness: 0.50, bluffRate: 0.07, raiseBias: 0.18, crowdSensitivity: 0.6,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.7, patternSensitivity: 0.6, exploitWeight: 0.7, preflopCommitCap: 0.22, lowSprJamMax: 1.40, lowSprJamStrength: 0.62, committedJamStrength: 0.42, raiseShoveCommit: 0.78, callThresholdShift: -0.04, peelMargin: 0.10, peelRate: 0.30 },
+  lag:        { label: '孙悟空', aggression: 0.68, looseness: 0.72, bluffRate: 0.10, raiseBias: 0.25, crowdSensitivity: 0.35, slowplayRate: 0.06, checkRaiseRate: 0.14, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.35, exploitWeight: 0.7, preflopCommitCap: 0.30, lowSprJamMax: 1.80, lowSprJamStrength: 0.48, committedJamStrength: 0.28, raiseShoveCommit: 0.65, callThresholdShift: -0.03, peelMargin: 0.10, peelRate: 0.24 },
+  station:    { label: '猪八戒', aggression: 0.18, looseness: 0.82, bluffRate: 0.02, raiseBias: 0.06, crowdSensitivity: 0.10, slowplayRate: 0.05, checkRaiseRate: 0.03, positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1, preflopCommitCap: 0.20, lowSprJamMax: 1.30, lowSprJamStrength: 0.60, committedJamStrength: 0.48, raiseShoveCommit: 0.85, callThresholdShift: -0.06, peelMargin: 0.18, peelRate: 0.45 },
+  maniac:     { label: '张飞',   aggression: 0.82, looseness: 0.85, bluffRate: 0.18, raiseBias: 0.38, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.08, exploitWeight: 0.3, preflopCommitCap: 0.40, lowSprJamMax: 2.20, lowSprJamStrength: 0.32, committedJamStrength: 0.18, raiseShoveCommit: 0.50, callThresholdShift: -0.04, peelMargin: 0.14, peelRate: 0.30 },
+  trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.58, bluffRate: 0.05, raiseBias: 0.12, crowdSensitivity: 0.5,  slowplayRate: 0.65, checkRaiseRate: 0.50, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.20, lowSprJamMax: 1.30, lowSprJamStrength: 0.62, committedJamStrength: 0.40, raiseShoveCommit: 0.80, callThresholdShift: -0.06, peelMargin: 0.16, peelRate: 0.42 },
+  bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.62, bluffRate: 0.12, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0.03, checkRaiseRate: 0.08, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.35, exploitWeight: 0.5, preflopCommitCap: 0.28, lowSprJamMax: 1.80, lowSprJamStrength: 0.42, committedJamStrength: 0.25, raiseShoveCommit: 0.58, callThresholdShift: -0.03, peelMargin: 0.10, peelRate: 0.24 },
+  tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.48, bluffRate: 0.05, raiseBias: 0.15, crowdSensitivity: 0.6,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.22, lowSprJamMax: 1.60, lowSprJamStrength: 0.48, committedJamStrength: 0.28, raiseShoveCommit: 0.62, callThresholdShift: -0.035, peelMargin: 0.10, peelRate: 0.26 },
+  shortstack: { label: '燕青',   aggression: 0.58, looseness: 0.52, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25, lowSprJamMax: 2.50, lowSprJamStrength: 0.28, committedJamStrength: 0.15, raiseShoveCommit: 0.40, callThresholdShift: -0.04, peelMargin: 0.10, peelRate: 0.22 },
+  adaptive:   { label: '曹操',   aggression: 0.52, looseness: 0.55, bluffRate: 0.08, raiseBias: 0.20, crowdSensitivity: 0.4,  slowplayRate: 0.10, checkRaiseRate: 0.14, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.22, lowSprJamMax: 1.60, lowSprJamStrength: 0.52, committedJamStrength: 0.32, raiseShoveCommit: 0.72, callThresholdShift: -0.04, peelMargin: 0.12, peelRate: 0.30 },
+  gto:        { label: '诸葛亮', aggression: 0.58, looseness: 0.52, bluffRate: 0.14, raiseBias: 0.26, crowdSensitivity: 0.45, slowplayRate: 0.20, checkRaiseRate: 0.25, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.22, lowSprJamMax: 1.40, lowSprJamStrength: 0.62, committedJamStrength: 0.42, raiseShoveCommit: 0.78, callThresholdShift: -0.045, peelMargin: 0.12, peelRate: 0.32 },
 };
 
 const TIMING_PROFILES: Record<SystemBotStyle, TimingProfile> = {
@@ -662,6 +667,19 @@ export class BuiltinBotAgent implements PlayerAgent {
   // ─── Human pressure tracking ────────────────────────────────────────────
   private playerMeta = new Map<number, { isBot: boolean; elo?: number }>();
 
+  // ─── Revenge tracking (v3: "you took my chips, I'm coming for you") ──
+  private revengeTargets = new Map<string, number>(); // playerId → revenge heat (0-1)
+
+  // ─── Momentum tracking (v3: winning streak confidence) ────────────────
+  private momentumLevel = 0; // -1 (cold streak) to +1 (hot streak)
+
+  // ─── Chips invested this hand (for stickiness) ────────────────────────
+  private handStartStack = 0;
+
+  // ─── Show bluff tracking (v3) ─────────────────────────────────────────
+  private lastActionWasBluff = false;
+  private lastBluffCards: [Card, Card] | null = null;
+
   constructor(
     readonly userId: string,
     private readonly definition: SystemBotDefinition,
@@ -680,6 +698,16 @@ export class BuiltinBotAgent implements PlayerAgent {
         this.currentBluffLine = false;
         this.bluffStreetCount = 0;
         this.myActionsThisHand = [];
+        this.lastActionWasBluff = false;
+        this.lastBluffCards = null;
+        // Track starting stack for pot commitment stickiness
+        this.handStartStack = msg.players.find(p => p.seat === msg.seat)?.stack ?? 0;
+        // Decay revenge heat each hand (-0.15 per hand, ~6 hands to cool off)
+        for (const [pid, heat] of this.revengeTargets) {
+          const newHeat = heat - 0.15;
+          if (newHeat <= 0.05) this.revengeTargets.delete(pid);
+          else this.revengeTargets.set(pid, newHeat);
+        }
         this.myPosition = calcPosition(
           msg.seat,
           msg.buttonSeat,
@@ -799,6 +827,31 @@ export class BuiltinBotAgent implements PlayerAgent {
 
         // Step 5: Cap at 0.75 (even full tilt ≠ complete maniac)
         this.tiltLevel = clamp01(Math.min(newTilt, 0.75));
+
+        // ─── v3: Revenge tracking ──────────────────────────────────────────
+        // If we lost and someone else won big, mark them as revenge target
+        if (!myWin) {
+          for (const w of msg.winners) {
+            if (w.seat === this.mySeat) continue;
+            const winnerId = this.seatToPlayerId.get(w.seat);
+            if (winnerId && w.amount > this.bigBlind * 8) {
+              // Heat proportional to how much they won (capped at 0.9)
+              const heat = Math.min(0.9, w.amount / (this.bigBlind * 50));
+              const existing = this.revengeTargets.get(winnerId) ?? 0;
+              this.revengeTargets.set(winnerId, Math.min(0.9, existing + heat));
+            }
+          }
+        }
+
+        // ─── v3: Momentum tracking ─────────────────────────────────────────
+        // EMA: win pushes toward +1, loss pushes toward -1
+        if (myWin && myWin.amount > 0) {
+          const winMag = Math.min(0.4, myWin.amount / (this.bigBlind * 30));
+          this.momentumLevel = clamp01(this.momentumLevel * 0.7 + winMag + 0.1) * 2 - 1;
+          this.momentumLevel = Math.max(-1, Math.min(1, this.momentumLevel));
+        } else {
+          this.momentumLevel = Math.max(-1, this.momentumLevel * 0.7 - 0.12);
+        }
         break;
       }
       case 'showdown_result':
@@ -826,6 +879,50 @@ export class BuiltinBotAgent implements PlayerAgent {
       .filter(p => p.seat !== this.mySeat)
       .reduce((s, p) => s + p.stack, 0) / Math.max(1, this.players.length - 1);
     const stackRatio = req.stack / Math.max(avgOppStack, 1);
+
+    // ─── v3: Revenge boost — aggression spike against players who beat us ─────
+    if (req.history.length > 0) {
+      const lastActorSeat = req.history[req.history.length - 1].seat;
+      const lastActorPid = this.seatToPlayerId.get(lastActorSeat);
+      if (lastActorPid) {
+        const revengeHeat = this.revengeTargets.get(lastActorPid) ?? 0;
+        if (revengeHeat > 0.1) {
+          cfg.aggression = clamp01(cfg.aggression + revengeHeat * 0.25);
+          cfg.bluffRate = clamp01(cfg.bluffRate + revengeHeat * 0.15);
+          cfg.looseness = clamp01(cfg.looseness + revengeHeat * 0.10);
+          cfg.raiseBias = clamp01(cfg.raiseBias + revengeHeat * 0.12);
+          extraReasoning += ` 报仇! 怒火${Math.round(revengeHeat * 100)}%.`;
+        }
+      }
+    }
+
+    // ─── v3: Momentum — hot streak = confidence, cold streak = tighter ──────
+    if (this.momentumLevel > 0.15) {
+      const m = this.momentumLevel;
+      cfg.looseness = clamp01(cfg.looseness + m * 0.10);
+      cfg.aggression = clamp01(cfg.aggression + m * 0.08);
+      cfg.bluffRate = clamp01(cfg.bluffRate + m * 0.06);
+      cfg.raiseBias = clamp01(cfg.raiseBias + m * 0.05);
+      if (m > 0.4) extraReasoning += ` 连胜势头!`;
+    } else if (this.momentumLevel < -0.3) {
+      // Cold streak: slightly tighter but NOT scared — maintain entertainment
+      const cold = Math.abs(this.momentumLevel);
+      cfg.bluffRate = clamp01(cfg.bluffRate - cold * 0.03);
+    }
+
+    // ─── v3: Pot commitment stickiness — already invested? Don't leave ──────
+    {
+      const chipsInvested = this.handStartStack - req.stack;
+      const investRatio = chipsInvested / Math.max(this.handStartStack, 1);
+      if (investRatio > 0.15 && req.street !== 'preflop') {
+        // The more we've put in, the stickier we get
+        const stickyBoost = Math.min(0.20, investRatio * 0.40);
+        cfg.looseness = clamp01(cfg.looseness + stickyBoost);
+        cfg.peelRate = clamp01(cfg.peelRate + stickyBoost * 0.8);
+        cfg.peelMargin = clamp01(cfg.peelMargin + stickyBoost * 0.5);
+        cfg.callThresholdShift -= stickyBoost * 0.15;
+      }
+    }
 
     // ─── Adaptive (曹操): mimic the weakness we currently observe ────────────
     if (style === 'adaptive') {
@@ -1013,12 +1110,7 @@ export class BuiltinBotAgent implements PlayerAgent {
       }
     }
 
-    // ─── Solver path: DCFR / Blueprint for postflop decisions ─────────
-    // Try solver-based decision first, BUT respect personality overrides above:
-    // - Shortstack push/fold already returned above (never reaches here)
-    // - Bully/tilter cfg mutations carry into heuristic fallback below
-    // - Solver applies its own style deviations (style-deviations.ts)
-    // Dynamic style shifting based on bot state:
+    // ─── Dynamic style shifting ────────────────────────────────────────
     // 林冲 (tilter): tilted → plays like 张飞 (maniac)
     // 鲁智深 (bully): chip advantage → plays like 孙悟空 (lag)
     let effectiveStyle: SystemBotStyle = personalityStyle;
@@ -1032,13 +1124,134 @@ export class BuiltinBotAgent implements PlayerAgent {
         extraReasoning += ` 筹码碾压(${stackRatio.toFixed(1)}x)!`;
       }
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // v3.3: DRAMATIC DECISION LAYER — runs BEFORE solver
+    // This layer handles context-aware plays that solver can't do:
+    //   1. Check-raise: bot checked this street, now faces bet → raise!
+    //   2. Slow-play harvest: bot checked on a prior street → now bet big
+    //   3. These create the "drama" that makes poker exciting
+    // ═══════════════════════════════════════════════════════════════════════
+    if (req.street !== 'preflop' && this.holeCards) {
+      const dramOpponents = this.getActiveOpponentCount();
+      const dramStrength = postflopStrengthMCV2(this.holeCards, req.board, dramOpponents);
+      const dramTexture = analyzeBoard(req.board);
+      const checkedThisStreet = this.myActionsThisHand.some(
+        a => a.street === req.street && a.action === 'check',
+      );
+      const checkedPriorStreet = this.myActionsThisHand.some(
+        a => a.street !== req.street && a.action === 'check',
+      );
+      const effectiveMinRaise = req.minRaise > req.stack * 2 ? req.stack : req.minRaise;
+      const minRaiseTotal = req.currentBet + effectiveMinRaise;
+      const maxRaiseTotal = req.currentBet + req.stack - req.toCall;
+      const canRaise = req.stack > req.toCall && minRaiseTotal <= maxRaiseTotal;
+
+      // ─── [1] CHECK-RAISE: I checked, opponent bet, now I strike ────────
+      if (checkedThisStreet && req.toCall > 0 && canRaise) {
+        const dryBoard = dramTexture?.wetness !== undefined ? dramTexture.wetness < 0.25 : false;
+
+        // Value check-raise: strength >= 0.30 (lowered from 0.40)
+        // Base frequency is high — cfg.checkRaiseRate is the primary knob
+        const valueCrFreq = clamp01(
+          cfg.checkRaiseRate
+          * (0.50 + Math.max(0, dramStrength - 0.25) * 1.2)
+          * (dryBoard ? 1.20 : 0.85),
+        );
+        if (dramStrength >= 0.30 && roll(valueCrFreq)) {
+          const crSize = Math.round(req.pot * (0.70 + dramStrength * 0.5));
+          const raiseTotal = clampInt(
+            req.currentBet + Math.max(crSize, effectiveMinRaise),
+            minRaiseTotal, maxRaiseTotal,
+          );
+          const action: PokerAction = raiseTotal >= maxRaiseTotal
+            ? { action: 'allin' } : { action: 'raise', amount: raiseTotal };
+          return this.finalizeBuiltinDecision({
+            ...action,
+            debug: {
+              equity: dramStrength,
+              reasoning: `${this.definition.name}: [CHECK-RAISE] 请君入瓮! 强度${Math.round(dramStrength * 100)}%.${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
+            },
+          }, effectiveStyle, req);
+        }
+
+        // Bluff check-raise: low strength, high checkRaiseRate styles will fire
+        // Frequency = bluffRate * 2.5 (boosted) * checkRaiseRate
+        const bluffCrFreq = clamp01(
+          cfg.bluffRate * 2.5
+          * cfg.checkRaiseRate
+          * (0.50 + (1 - dramStrength) * 0.6)
+          * (dryBoard ? 1.35 : 0.65),
+        );
+        if (dramStrength < 0.28 && roll(bluffCrFreq)) {
+          const crSize = Math.round(req.pot * 0.80);
+          const raiseTotal = clampInt(
+            req.currentBet + Math.max(crSize, effectiveMinRaise),
+            minRaiseTotal, maxRaiseTotal,
+          );
+          const action: PokerAction = raiseTotal >= maxRaiseTotal
+            ? { action: 'allin' } : { action: 'raise', amount: raiseTotal };
+          return this.finalizeBuiltinDecision({
+            ...action,
+            debug: {
+              equity: dramStrength,
+              reasoning: `${this.definition.name}: [BLUFF CHECK-RAISE] 空手套白狼!${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
+            },
+          }, effectiveStyle, req);
+        }
+      }
+
+      // ─── [2] SLOW-PLAY HARVEST: I checked before, now I strike ─────────
+      if (checkedPriorStreet && req.toCall === 0 && canRaise && dramStrength >= 0.45) {
+        const harvestFreq = clamp01(
+          cfg.slowplayRate
+          * (0.40 + dramStrength * 0.8)
+          * (req.street === 'river' ? 1.30 : 1.0),
+        );
+        if (roll(harvestFreq)) {
+          const harvestSize = Math.round(req.pot * (0.65 + dramStrength * 0.5));
+          const raiseTotal = clampInt(
+            req.currentBet + Math.max(harvestSize, effectiveMinRaise),
+            minRaiseTotal, maxRaiseTotal,
+          );
+          const action: PokerAction = raiseTotal >= maxRaiseTotal
+            ? { action: 'allin' } : { action: 'raise', amount: raiseTotal };
+          return this.finalizeBuiltinDecision({
+            ...action,
+            debug: {
+              equity: dramStrength,
+              reasoning: `${this.definition.name}: [收网] 蛰伏结束，收割!${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
+            },
+          }, effectiveStyle, req);
+        }
+      }
+
+      // ─── [3] SLOW-PLAY ENTRY: strong hand but choose to check ──────────
+      if (req.toCall === 0 && dramStrength >= 0.50) {
+        const slowFreq = clamp01(
+          cfg.slowplayRate
+          * (0.30 + Math.max(0, dramStrength - 0.50) * 1.2)
+          * (dramTexture && dramTexture.wetness < 0.35 ? 1.20 : 0.75),
+        );
+        if (roll(slowFreq)) {
+          return this.finalizeBuiltinDecision({
+            action: 'check',
+            debug: {
+              equity: dramStrength,
+              reasoning: `${this.definition.name}: [SLOW-PLAY] 暗藏杀机，示弱引诱.${extraReasoning} ${describeHolding(req.street, this.holeCards, req.board)}.`,
+            },
+          }, effectiveStyle, req);
+        }
+      }
+    }
+
+    // ─── Solver path: DCFR / Blueprint for postflop decisions ─────────
     if (req.street !== 'preflop') {
       const numOpponents = this.getActiveOpponentCount();
-      // Build opponent model for adaptive (曹操) exploitation
       const oppProfile = this.getAverageOpponentProfile();
       const oppModel = oppProfile.hands >= 5 ? {
         foldToCbet: oppProfile.foldToCbetRate,
-        foldTo3bet: oppProfile.foldToCbetRate, // approximate
+        foldTo3bet: oppProfile.foldToCbetRate,
         vpip: oppProfile.vpipRate,
         af: oppProfile.af,
         wtsd: oppProfile.wtsdRate,
@@ -1065,38 +1278,9 @@ export class BuiltinBotAgent implements PlayerAgent {
       }
     }
 
-    // ─── GTO (诸葛亮): use balanced mixed strategy (postflop only) ─────
-    // Preflop: use position-aware ranges like other styles. MDF defense
-    // doesn't apply preflop and inflates VPIP to ~70%.
-    if (style === 'gto' && req.street !== 'preflop') {
-      const opponents = this.getActiveOpponentCount();
-      const gtoStrength = postflopStrengthMCV2(this.holeCards, req.board, opponents);
-      const texture = analyzeBoard(req.board);
-      const balancedReq: BalancedActionRequest = {
-        street: req.street,
-        board: req.board,
-        pot: req.pot,
-        currentBet: req.currentBet,
-        toCall: req.toCall,
-        minRaise: req.minRaise,
-        stack: req.stack,
-        initialStack: req.initialStack,
-      };
-      const decision = chooseBalancedAction(gtoStrength, balancedReq, texture, opponents + 1);
-      const { frequencies } = decision;
-      return this.finalizeBuiltinDecision({
-        action: decision.action,
-        ...(decision.amount > 0 ? { amount: decision.amount } : {}),
-        debug: {
-          equity: decision.strength,
-          potOdds: req.toCall > 0 ? req.toCall / Math.max(req.pot + req.toCall, 1) : 0,
-          foldFreq: frequencies.fold,
-          callFreq: frequencies.call,
-          raiseFreq: frequencies.raise,
-          reasoning: `${this.definition.name}: 均衡策略 [F${Math.round(frequencies.fold * 100)}% C${Math.round(frequencies.call * 100)}% R${Math.round(frequencies.raise * 100)}%] ${decision.reasoning}. ${describeHolding(req.street, this.holeCards, req.board)}.`,
-        },
-      }, 'gto', req);
-    }
+    // NOTE: 诸葛亮(GTO) no longer has a separate path — uses the same
+    // solver→heuristic pipeline as everyone else, with his STYLE_CONFIG
+    // params (high slowplayRate/checkRaiseRate) providing the "balanced" feel.
 
     // ─── v2 Preflop: use getPreflopAction for position-aware decisions ────
     const opponents = req.street === 'preflop'
@@ -1302,6 +1486,31 @@ export class BuiltinBotAgent implements PlayerAgent {
       result.debug.thinkMs = thinkMs;
     }
 
+    // ─── v3: Show bluff detection ──────────────────────────────────────
+    // When bot raises/bets with weak equity, mark as potential show bluff.
+    // Per-style frequency: maniac loves to show, nit never does.
+    const SHOW_BLUFF_FREQ: Partial<Record<SystemBotStyle, number>> = {
+      maniac: 0.25, lag: 0.15, bully: 0.18, tilter: 0.12,
+      adaptive: 0.10, trapper: 0.08, shortstack: 0.10,
+      gto: 0.05, tag: 0.03, station: 0.02, nit: 0.01,
+    };
+    const isAggressiveAction = result.action === 'raise' || result.action === 'allin';
+    const equity = result.debug?.equity ?? 0.5;
+    if (isAggressiveAction && equity < 0.30 && this.holeCards) {
+      const showFreq = SHOW_BLUFF_FREQ[style] ?? 0.05;
+      if (Math.random() < showFreq) {
+        if (result.debug) result.debug.showBluff = true;
+        this.lastActionWasBluff = true;
+        this.lastBluffCards = this.holeCards;
+      } else {
+        this.lastActionWasBluff = false;
+        this.lastBluffCards = null;
+      }
+    } else {
+      this.lastActionWasBluff = false;
+      this.lastBluffCards = null;
+    }
+
     if (!ENABLE_BUILTIN_BOT_TIMING || thinkMs <= 0) {
       return Promise.resolve(result);
     }
@@ -1328,6 +1537,17 @@ export class BuiltinBotAgent implements PlayerAgent {
       this.mySeat,
       this.handActions,
     );
+  }
+
+  /** v3: returns bluff cards if bot wants to show bluff after winning by fold */
+  getShowBluff(): { cards: [Card, Card]; name: string } | null {
+    if (this.lastActionWasBluff && this.lastBluffCards) {
+      const result = { cards: this.lastBluffCards, name: this.definition.name };
+      this.lastActionWasBluff = false;
+      this.lastBluffCards = null;
+      return result;
+    }
+    return null;
   }
 
   /** Compute average opponent VPIP rate and aggression factor. */

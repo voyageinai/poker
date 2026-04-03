@@ -51,6 +51,8 @@ export class TableManager {
   private blindsPhase = false;
   /** Per-seat starting stack for the current hand (before any bets including blinds) */
   private initialStacks = new Map<number, number>();
+  /** v3: track whether current hand had a showdown (for show bluff logic) */
+  private hadShowdown = false;
 
   // Per-table action queue: serializes all mutations
   private actionQueue: Promise<void> = Promise.resolve();
@@ -275,6 +277,7 @@ export class TableManager {
     this.currentStreet = 'preflop';
     this.streetHistory = [];
     this.blindsPhase = true;
+    this.hadShowdown = false;
 
     let events: TableEvent[];
     try {
@@ -479,6 +482,7 @@ export class TableManager {
       }
 
       case 'showdown': {
+        this.hadShowdown = true;
         wsHub.broadcast(this.tableId, {
           type: 'showdown',
           results: event.results,
@@ -611,6 +615,25 @@ export class TableManager {
           pot: event.pot,
           ...(rake > 0 ? { rake } : {}),
         } satisfies WsServerMessage);
+
+        // v3: Show bluff — if hand ended without showdown and winner was a bluffing bot
+        if (!this.hadShowdown && event.winners.length > 0) {
+          for (const w of event.winners) {
+            const info = this.agents.get(w.seat);
+            if (info?.agent.getShowBluff) {
+              const bluff = info.agent.getShowBluff();
+              if (bluff) {
+                const p = this.state.players[w.seat];
+                wsHub.broadcast(this.tableId, {
+                  type: 'show_bluff',
+                  seat: w.seat,
+                  cards: bluff.cards,
+                  playerName: bluff.name,
+                } satisfies WsServerMessage);
+              }
+            }
+          }
+        }
 
         // Notify bots
         for (const info of this.agents.values()) {
@@ -848,6 +871,13 @@ export class TableManager {
         this._nextHandTimer = null;
       }
       console.log(`[Table ${this.tableId}] No humans left — all bots cleaned up`);
+
+      // Auto-close the now-empty table: remove from registry and mark DB closed
+      if (this.isEmpty()) {
+        console.log(`[Table ${this.tableId}] Table empty after bot cleanup — auto-closing`);
+        activeManagers.delete(this.tableId);
+        dbCloseTable(this.tableId);
+      }
     }
   }
 
@@ -1050,7 +1080,7 @@ export function getOrCreateTableManager(tableId: string): TableManager | null {
 // ─── Stake level helpers ──────────────────────────────────────────────────
 
 import { STAKE_LEVELS } from '@/lib/stake-levels';
-import { listTablesForLevel, createTable as dbCreateTable } from '@/db/queries';
+import { listTablesForLevel, createTable as dbCreateTable, closeTable as dbCloseTable } from '@/db/queries';
 
 /**
  * Find an existing open table for the given stake level that has an empty seat,
@@ -1144,6 +1174,83 @@ export function getInPlayChips(): number {
   return total;
 }
 
+// ─── Admin helpers ──────────────────────────────────────────────────────────
+
+export interface AdminTableSeat {
+  seat: number;
+  displayName: string;
+  kind: 'human' | 'bot';
+  stack: number;
+  status: string;
+}
+
+export interface AdminTableInfo {
+  id: string;
+  name: string;
+  level: string;
+  levelName: string;
+  smallBlind: number;
+  bigBlind: number;
+  maxSeats: number;
+  status: string;
+  handNumber: number;
+  pot: number;
+  players: AdminTableSeat[];
+  playerCount: number;
+  createdAt: number;
+}
+
+/** Return detail info for every active table (admin use). */
+export function getActiveTableDetails(): AdminTableInfo[] {
+  const result: AdminTableInfo[] = [];
+  for (const [tableId, mgr] of activeManagers) {
+    const dbTable = getTableById(tableId);
+    if (!dbTable) continue;
+    const state = mgr.getState();
+    const stakeLevel = getStakeLevel(dbTable.level);
+    const players: AdminTableSeat[] = [];
+    for (const p of state.players) {
+      if (!p) continue;
+      players.push({
+        seat: p.seatIndex,
+        displayName: p.displayName,
+        kind: p.kind,
+        stack: p.stack,
+        status: p.status,
+      });
+    }
+    result.push({
+      id: tableId,
+      name: dbTable.name,
+      level: dbTable.level,
+      levelName: stakeLevel?.name ?? dbTable.level,
+      smallBlind: dbTable.small_blind,
+      bigBlind: dbTable.big_blind,
+      maxSeats: dbTable.max_seats,
+      status: state.status,
+      handNumber: state.handNumber,
+      pot: state.pot.total,
+      players,
+      playerCount: players.length,
+      createdAt: dbTable.created_at,
+    });
+  }
+  // Sort by level then creation time
+  const levelOrder = ['micro', 'low', 'mid', 'high', 'elite'];
+  result.sort((a, b) => levelOrder.indexOf(a.level) - levelOrder.indexOf(b.level) || a.createdAt - b.createdAt);
+  return result;
+}
+
+/** Force-close a table: dispose manager, mark DB closed, return chips. */
+export function forceCloseTable(tableId: string): boolean {
+  const mgr = activeManagers.get(tableId);
+  if (!mgr) return false;
+  mgr.dispose();
+  activeManagers.delete(tableId);
+  dbCloseTable(tableId);
+  return true;
+}
+
 // ─── Idle cleanup ───────────────────────────────────────────────────────────
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -1155,6 +1262,7 @@ setInterval(() => {
       console.log(`[TableManager] Cleaning up idle table ${tableId}`);
       mgr.dispose();
       activeManagers.delete(tableId);
+      dbCloseTable(tableId);
     }
   }
 }, 60_000); // Check every minute

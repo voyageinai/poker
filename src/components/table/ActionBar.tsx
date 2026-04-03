@@ -53,9 +53,10 @@ export default function ActionBar({
     <motion.div
       animate={{ height: compact ? (expanded ? 136 : 44) : (expanded ? 120 : 48) }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className={`shrink-0 overflow-hidden border-t border-[var(--border)] bg-bg-surface safe-bottom ${
+      className={`shrink-0 overflow-hidden bg-bg-surface safe-bottom relative ${
         compact ? 'px-2 rounded-none' : 'px-3 rounded-b-lg'
       }`}
+      style={{ borderTop: '1px solid var(--border)' }}
     >
       <div className="flex h-full items-center justify-center">
         {/* Busted — rebuy prompt */}

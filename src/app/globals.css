@@ -4,52 +4,67 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─── Dense Data-Art 主题 ──────────────────────────────────────────────────
-   深海军蓝底 #0d1b2a  /  teal accent #00b4d8  /  amber accent #f59e0b
+/* ─── 赤壁夜战 Theme — Crimson Cliff ──────────────────────────────────────
+   墨玉黑底 #0a0a0f  /  朱砂赤 #dc2626  /  鎏金 #d4a574
+   灵感：三国赤壁 × 铜雀台 — 火焰与黄金的极致碰撞
    始终暗色，shadcn 语义变量直接映射到暗色调色板
 ─────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* ── 项目自有调色板 ─────────────────────────────── */
-  --bg-base:       #0d1b2a;
-  --bg-surface:    #112236;
-  --bg-card:       #162d44;
-  --bg-hover:      #1d3a56;
+  /* ── 项目调色板 ─────────────────────────────── */
+  --bg-base:       #0a0a0f;
+  --bg-surface:    #141418;
+  --bg-card:       #1c1c22;
+  --bg-hover:      #26262e;
 
-  --teal:          #00b4d8;
-  --teal-dim:      #0077a8;
-  --teal-glow:     rgba(0, 180, 216, 0.15);
+  --crimson:       #dc2626;
+  --crimson-dim:   #991b1b;
+  --crimson-glow:  rgba(220, 38, 38, 0.15);
 
-  --amber:         #f59e0b;
-  --amber-dim:     #b97a08;
-  --amber-glow:    rgba(245, 158, 11, 0.15);
+  --gold:          #d4a574;
+  --gold-dim:      #a67c50;
+  --gold-glow:     rgba(212, 165, 116, 0.15);
 
-  --text-primary:  #e2eaf3;
-  --text-secondary:#7a9ab5;
-  --text-muted:    #4a6880;
+  --text-primary:  #f0e8da;
+  --text-secondary:#9a9088;
+  --text-muted:    #5a554e;
 
-  --border:        #1e3a54;
-  --border-bright: #2a5070;
+  --border:        #2a2a32;
+  --border-bright: #3a3a44;
 
-  --red-card:      #ef4444;
-  --black-card:    #e2eaf3;
+  --red-card:      #dc2626;
+  --black-card:    #f0e8da;
 
   --win:           #22c55e;
   --loss:          #ef4444;
-  --fold:          #64748b;
+  --fold:          #6b6570;
+
+  /* ── backwards compat aliases (旧名→新值) ─── */
+  --teal:          #dc2626;
+  --teal-dim:      #991b1b;
+  --teal-glow:     rgba(220, 38, 38, 0.15);
+  --amber:         #d4a574;
+  --amber-dim:     #a67c50;
+  --amber-glow:    rgba(212, 165, 116, 0.15);
 
   /* ── Glow / Shadow / Timing tokens ─────────────── */
-  --glow-teal:     0 0 20px rgba(0, 180, 216, 0.30);
-  --glow-teal-lg:  0 0 40px rgba(0, 180, 216, 0.20), 0 0 80px rgba(0, 180, 216, 0.10);
-  --glow-amber:    0 0 20px rgba(245, 158, 11, 0.30);
-  --glow-amber-lg: 0 0 40px rgba(245, 158, 11, 0.20), 0 0 80px rgba(245, 158, 11, 0.10);
+  --glow-teal:     0 0 20px rgba(220, 38, 38, 0.30);
+  --glow-teal-lg:  0 0 40px rgba(220, 38, 38, 0.20), 0 0 80px rgba(220, 38, 38, 0.10);
+  --glow-amber:    0 0 20px rgba(212, 165, 116, 0.30);
+  --glow-amber-lg: 0 0 40px rgba(212, 165, 116, 0.20), 0 0 80px rgba(212, 165, 116, 0.10);
+
+  --glow-crimson:    0 0 20px rgba(220, 38, 38, 0.30);
+  --glow-crimson-lg: 0 0 40px rgba(220, 38, 38, 0.20), 0 0 80px rgba(220, 38, 38, 0.10);
+  --glow-gold:       0 0 20px rgba(212, 165, 116, 0.30);
+  --glow-gold-lg:    0 0 40px rgba(212, 165, 116, 0.20), 0 0 80px rgba(212, 165, 116, 0.10);
+
   --glow-win:      0 0 20px rgba(34, 197, 94, 0.30);
   --glow-win-lg:   0 0 40px rgba(34, 197, 94, 0.20), 0 0 80px rgba(34, 197, 94, 0.10);
   --glow-loss:     0 0 20px rgba(239, 68, 68, 0.30);
 
-  --shadow-subtle:   0 1px 3px rgba(0,0,0,0.3);
-  --shadow-medium:   0 4px 12px rgba(0,0,0,0.4);
-  --shadow-dramatic: 0 8px 32px rgba(0,0,0,0.5);
+  --shadow-subtle:   0 1px 3px rgba(0,0,0,0.4);
+  --shadow-medium:   0 4px 12px rgba(0,0,0,0.5);
+  --shadow-dramatic: 0 8px 32px rgba(0,0,0,0.6);
 
   --dur-micro:     100ms;
   --dur-quick:     200ms;
@@ -57,42 +72,42 @@
   --dur-dramatic:  600ms;
   --dur-slow:      1000ms;
 
-  /* ── shadcn 语义变量 → 映射到暗色调色板 ─────────── */
-  --background:             #0d1b2a;
-  --foreground:             #e2eaf3;
-  --card:                   #162d44;
-  --card-foreground:        #e2eaf3;
-  --popover:                #162d44;
-  --popover-foreground:     #e2eaf3;
-  --primary:                #00b4d8;
+  /* ── shadcn 语义变量 → 暗色调色板 ─────────── */
+  --background:             #0a0a0f;
+  --foreground:             #f0e8da;
+  --card:                   #1c1c22;
+  --card-foreground:        #f0e8da;
+  --popover:                #1c1c22;
+  --popover-foreground:     #f0e8da;
+  --primary:                #dc2626;
   --primary-foreground:     #ffffff;
-  --secondary:              #112236;
-  --secondary-foreground:   #e2eaf3;
-  --muted:                  #1d3a56;
-  --muted-foreground:       #4a6880;
-  --accent:                 #1d3a56;
-  --accent-foreground:      #e2eaf3;
+  --secondary:              #141418;
+  --secondary-foreground:   #f0e8da;
+  --muted:                  #26262e;
+  --muted-foreground:       #5a554e;
+  --accent:                 #26262e;
+  --accent-foreground:      #f0e8da;
   --destructive:            #ef4444;
-  --input:                  #2a5070;
-  --ring:                   #00b4d8;
+  --input:                  #3a3a44;
+  --ring:                   #dc2626;
   --radius:                 0.5rem;
 
   /* shadcn sidebar */
-  --sidebar:                    #112236;
-  --sidebar-foreground:         #e2eaf3;
-  --sidebar-primary:            #00b4d8;
+  --sidebar:                    #141418;
+  --sidebar-foreground:         #f0e8da;
+  --sidebar-primary:            #dc2626;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent:             #1d3a56;
-  --sidebar-accent-foreground:  #e2eaf3;
-  --sidebar-border:             #1e3a54;
-  --sidebar-ring:               #00b4d8;
+  --sidebar-accent:             #26262e;
+  --sidebar-accent-foreground:  #f0e8da;
+  --sidebar-border:             #2a2a32;
+  --sidebar-ring:               #dc2626;
 
-  /* shadcn chart colors */
-  --chart-1: #00b4d8;
-  --chart-2: #f59e0b;
+  /* shadcn chart */
+  --chart-1: #dc2626;
+  --chart-2: #d4a574;
   --chart-3: #22c55e;
   --chart-4: #ef4444;
-  --chart-5: #7a9ab5;
+  --chart-5: #9a9088;
 }
 
 /* ─── Base styles ───────────────────────────────────────────────────────── */
@@ -122,23 +137,56 @@ html, body {
   gap: 0.25rem;
   font-family: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
-  color: var(--amber);
+  color: var(--gold);
   font-weight: 600;
 }
 
 /* ─── Pulse animation (active player seat) ──────────────────────────────── */
 @keyframes pulse-border {
-  0%, 100% { border-color: var(--teal-dim); }
-  50%       { border-color: var(--teal); box-shadow: 0 0 16px var(--teal-glow); }
+  0%, 100% { border-color: var(--crimson-dim); }
+  50%       { border-color: var(--crimson); box-shadow: 0 0 20px rgba(220, 38, 38, 0.25); }
+}
+
+/* ─── Ember pulse (all-in dramatic glow) ────────────────────────────────── */
+@keyframes ember-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(220, 38, 38, 0.3), inset 0 0 4px rgba(220, 38, 38, 0.1); }
+  50% { box-shadow: 0 0 24px rgba(220, 38, 38, 0.5), 0 0 48px rgba(220, 38, 38, 0.2), inset 0 0 8px rgba(220, 38, 38, 0.15); }
+}
+
+/* ─── Gold shimmer (winner celebration) ─────────────────────────────────── */
+@keyframes gold-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
 }
 
 /* ─── Scrollbar styling ──────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-base); }
 ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--teal-dim); }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
 
-/* ─── Scanline overlay (terminal/mono-industrial aesthetic) ──────────────── */
+/* ─── Glass effect ──────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(20, 20, 24, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ─── Gold accent borders ──────────────────────────────────────────────── */
+.gold-top {
+  border-top: 2px solid var(--gold-dim);
+}
+.gold-left {
+  border-left: 3px solid var(--gold-dim);
+}
+
+/* ─── Gold gradient divider line ───────────────────────────────────────── */
+.gold-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+}
+
+/* ─── Ink grain overlay (atmospheric texture) ──────────────────────────── */
 .scanlines {
   position: relative;
 }
@@ -151,22 +199,22 @@ html, body {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 0, 0, 0.06) 2px,
-    rgba(0, 0, 0, 0.06) 4px
+    rgba(0, 0, 0, 0.05) 2px,
+    rgba(0, 0, 0, 0.05) 4px
   );
   border-radius: inherit;
   z-index: 1;
 }
 
-/* ─── Noise texture (felt / atmospheric surfaces) ───────────────────────── */
+/* ─── Silk texture (atmospheric surfaces) ──────────────────────────────── */
 .noise-texture::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: 0.04;
   z-index: 1;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 256px 256px;
   border-radius: inherit;
 }
@@ -190,11 +238,13 @@ html, body {
 }
 
 /* ─── Glow text ─────────────────────────────────────────────────────────── */
-.glow-text-teal {
-  text-shadow: 0 0 8px rgba(0, 180, 216, 0.5), 0 0 20px rgba(0, 180, 216, 0.2);
+.glow-text-teal,
+.glow-text-crimson {
+  text-shadow: 0 0 8px rgba(220, 38, 38, 0.5), 0 0 20px rgba(220, 38, 38, 0.2);
 }
-.glow-text-amber {
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.5), 0 0 20px rgba(245, 158, 11, 0.2);
+.glow-text-amber,
+.glow-text-gold {
+  text-shadow: 0 0 8px rgba(212, 165, 116, 0.5), 0 0 20px rgba(212, 165, 116, 0.2);
 }
 .glow-text-win {
   text-shadow: 0 0 8px rgba(34, 197, 94, 0.5), 0 0 20px rgba(34, 197, 94, 0.2);
@@ -203,15 +253,16 @@ html, body {
 /* ─── Edge light (depth illusion for cards/containers) ──────────────────── */
 .edge-light {
   box-shadow:
-    inset 0 1px 0 rgba(0, 180, 216, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 1px 3px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(212, 165, 116, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.4);
 }
-.edge-light-amber {
+.edge-light-amber,
+.edge-light-gold {
   box-shadow:
-    inset 0 1px 0 rgba(245, 158, 11, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 1px 3px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(212, 165, 116, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* ─── Blinking cursor (terminal reasoning text) ─────────────────────────── */
@@ -222,7 +273,7 @@ html, body {
 .blink-cursor::after {
   content: '█';
   animation: blink-cursor 1s step-end infinite;
-  color: var(--teal);
+  color: var(--crimson);
   margin-left: 2px;
   font-size: 0.85em;
 }
@@ -260,11 +311,11 @@ html, body {
 
 /* ─── Logo glow pulse ───────────────────────────────────────────────────── */
 @keyframes logo-glow-pulse {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(0, 180, 216, 0.2)); }
-  50% { filter: drop-shadow(0 0 10px rgba(0, 180, 216, 0.5)); }
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(220, 38, 38, 0.25)); }
+  50% { filter: drop-shadow(0 0 14px rgba(220, 38, 38, 0.6)); }
 }
 
-/* ─── Rim shimmer (table edge iridescence) ──────────────────────────────── */
+/* ─── Rim shimmer (decorative background animation) ────────────────────── */
 @keyframes rim-shimmer {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
@@ -279,36 +330,29 @@ html, body {
 
 /* ─── Mobile overrides ──────────────────────────────────────────────────── */
 
-/* Ensure touch targets are large enough (44px minimum) */
 @media (max-width: 767px) {
-  /* Prevent zoom on input focus (iOS) */
   input, select, textarea {
     font-size: 16px !important;
   }
-
-  /* Larger scrollbar for touch */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
-
-  /* Disable hover effects on touch devices */
   @media (hover: none) {
     .hover\:border-teal\/40:hover { border-color: unset; }
+    .hover\:border-crimson\/40:hover { border-color: unset; }
   }
 }
 
-/* Safe area insets for notched phones */
 @supports (padding: env(safe-area-inset-bottom)) {
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
-/* Mobile slide-up panel */
 .mobile-panel-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.7);
   z-index: 40;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
 }
 
 .mobile-panel {
@@ -319,7 +363,7 @@ html, body {
   max-height: 70vh;
   z-index: 50;
   background: var(--bg-surface);
-  border-top: 1px solid var(--border-bright);
+  border-top: 1px solid var(--gold-dim);
   border-radius: 1rem 1rem 0 0;
   overflow: hidden;
   display: flex;
@@ -329,7 +373,7 @@ html, body {
 .mobile-panel-handle {
   width: 36px;
   height: 4px;
-  background: var(--text-muted);
+  background: var(--gold-dim);
   border-radius: 2px;
   margin: 8px auto;
   opacity: 0.5;
@@ -342,7 +386,7 @@ html, body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--amber);
+  background: var(--gold);
   border: 2px solid rgba(0, 0, 0, 0.3);
   cursor: pointer;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
@@ -352,7 +396,7 @@ html, body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--amber);
+  background: var(--gold);
   border: 2px solid rgba(0, 0, 0, 0.3);
   cursor: pointer;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
@@ -370,7 +414,6 @@ html, body {
   background: var(--bg-card);
 }
 
-/* Safe area insets for landscape notched phones */
 @supports (padding: env(safe-area-inset-left)) {
   .safe-left { padding-left: env(safe-area-inset-left); }
   .safe-right { padding-right: env(safe-area-inset-right); }
@@ -378,10 +421,11 @@ html, body {
 
 /* ─── Tailwind v4 @theme — 注册自定义色彩和字体供 utility classes 使用 ──── */
 @theme inline {
-  /* 字体 */
-  --font-sans:  'Inter Variable', 'Inter', 'SF Pro Display', system-ui, sans-serif;
-  --font-mono:  'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
-  --font-heading: var(--font-sans);
+  /* 字体 — Cinzel (帝王铭文体) + Outfit (现代几何体) */
+  --font-display: 'Cinzel Variable', 'Cinzel', 'Times New Roman', serif;
+  --font-sans:    'Outfit Variable', 'Outfit', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-heading: var(--font-display);
 
   /* 项目自定义色彩 */
   --color-bg-base:       var(--bg-base);
@@ -389,13 +433,21 @@ html, body {
   --color-bg-card:       var(--bg-card);
   --color-bg-hover:      var(--bg-hover);
 
-  --color-teal:          var(--teal);
-  --color-teal-dim:      var(--teal-dim);
-  --color-teal-glow:     var(--teal-glow);
+  --color-crimson:       var(--crimson);
+  --color-crimson-dim:   var(--crimson-dim);
+  --color-crimson-glow:  var(--crimson-glow);
 
-  --color-amber:         var(--amber);
-  --color-amber-dim:     var(--amber-dim);
-  --color-amber-glow:    var(--amber-glow);
+  --color-gold:          var(--gold);
+  --color-gold-dim:      var(--gold-dim);
+  --color-gold-glow:     var(--gold-glow);
+
+  /* backwards compat: text-teal → crimson, text-amber → gold */
+  --color-teal:          var(--crimson);
+  --color-teal-dim:      var(--crimson-dim);
+  --color-teal-glow:     var(--crimson-glow);
+  --color-amber:         var(--gold);
+  --color-amber-dim:     var(--gold-dim);
+  --color-amber-glow:    var(--gold-glow);
 
   --color-text-primary:  var(--text-primary);
   --color-text-secondary:var(--text-secondary);

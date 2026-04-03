@@ -38,8 +38,8 @@ const ACTION_LABELS: Record<string, string> = {
 const ACTION_COLORS: Record<string, string> = {
   fold: 'var(--fold)',
   check: '#10b981',
-  call: 'var(--teal)',
-  raise: 'var(--amber)',
+  call: 'var(--crimson)',
+  raise: 'var(--gold)',
   allin: '#f87171',
 };
 
@@ -115,7 +115,7 @@ export default function HandReplayPage() {
       </Link>
 
       <div className="mt-2 mb-1 flex items-center gap-3">
-        <h1 className="text-xl font-bold tracking-tight m-0">
+        <h1 className="text-xl font-heading font-bold tracking-wider m-0">
           第 {hand.hand_number} 局
           <span className="text-text-muted font-normal ml-3 text-[0.85rem]">
             底池: <span className="chip-count mono">{hand.pot}</span>
@@ -166,8 +166,8 @@ export default function HandReplayPage() {
                       className={cn(
                         'text-[0.6rem] font-mono h-auto py-0 px-1.5 rounded-[0.2rem] border-0',
                         kind === 'bot'
-                          ? 'bg-[rgba(0,180,216,0.15)] text-teal'
-                          : 'bg-[rgba(245,158,11,0.1)] text-amber',
+                          ? 'bg-[rgba(220,38,38,0.12)] text-teal'
+                          : 'bg-[rgba(212,165,116,0.1)] text-amber',
                       )}
                     >
                       {kind === 'bot' ? <><Hexagon className="inline h-3 w-3" /> Bot</> : '玩家'}
@@ -175,7 +175,7 @@ export default function HandReplayPage() {
                     {hand.button_seat === p.seat_index && (
                       <Badge
                         variant="outline"
-                        className="text-[0.6rem] bg-[rgba(245,158,11,0.2)] text-amber border-0 h-auto py-0 px-1.5 rounded-[3px]"
+                        className="text-[0.6rem] bg-[rgba(212,165,116,0.15)] text-amber border-0 h-auto py-0 px-1.5 rounded-[3px]"
                       >
                         BTN
                       </Badge>

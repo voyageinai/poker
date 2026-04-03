@@ -5,6 +5,7 @@ import EmptySeat from '@/components/table/EmptySeat';
 import BoardCards from '@/components/table/BoardCards';
 import PotDisplay from '@/components/table/PotDisplay';
 import WinnerOverlay from '@/components/table/WinnerOverlay';
+import PlayingCard from '@/components/PlayingCard';
 
 // ─── Elliptical table layout helpers ──────────────────────────────────────────
 
@@ -66,6 +67,7 @@ interface TableFeltProps {
   myHoleCards: [Card, Card] | null;
   showdown: ShowdownResult[] | null;
   lastWinners: WinnerEntry[] | null;
+  showBluff?: { seat: number; cards: [Card, Card]; playerName: string } | null;
   currentUserId: string | null;
   isSeated: boolean;
   heroSeat: number | null;
@@ -80,6 +82,7 @@ export default function TableFelt({
   myHoleCards,
   showdown,
   lastWinners,
+  showBluff,
   currentUserId,
   isSeated,
   heroSeat,
@@ -101,17 +104,17 @@ export default function TableFelt({
         className="absolute rounded-[50%] noise-texture"
         style={{
           inset: compact ? '10% 6%' : '8% 4%',
-          background: 'radial-gradient(ellipse at center, #153d2f 0%, #0f3025 50%, #091e18 100%)',
-          border: compact ? '1.5px solid #3a7a60' : '2px solid #3a7a60',
+          background: 'radial-gradient(ellipse at center, #2a1810 0%, #1a0f08 50%, #100a06 100%)',
+          border: compact ? '1.5px solid var(--gold-dim)' : '2px solid var(--gold-dim)',
           boxShadow: compact
-            ? 'inset 0 0 20px rgba(0,0,0,0.5), 0 2px 12px rgba(0,0,0,0.5)'
-            : `inset 0 0 40px rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,255,255,0.05), 0 2px 0 #1a4a35, 0 4px 0 #0d3020, 0 6px 24px rgba(0,0,0,0.5)`,
+            ? 'inset 0 0 20px rgba(0,0,0,0.6), 0 2px 12px rgba(0,0,0,0.6)'
+            : `inset 0 0 40px rgba(0,0,0,0.6), inset 0 2px 0 rgba(212,165,116,0.04), 0 2px 0 #1a0f08, 0 4px 0 #100a06, 0 6px 24px rgba(0,0,0,0.6)`,
         }}
       >
         <div
           className="absolute inset-0 rounded-[50%] pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse 40% 35% at center, rgba(255,255,255,0.03), transparent)',
+            background: 'radial-gradient(ellipse 40% 35% at center, rgba(212,165,116,0.03), transparent)',
           }}
         />
       </div>
@@ -138,6 +141,18 @@ export default function TableFelt({
             myPlayer={myPlayer}
             compact={compact}
           />
+        )}
+
+        {showBluff && (
+          <div className="mt-1 flex items-center gap-1.5 animate-pulse">
+            <span className="text-xs font-bold text-red-400 tracking-wide">
+              {showBluff.playerName} 亮牌示威!
+            </span>
+            <div className="flex gap-0.5">
+              <PlayingCard card={showBluff.cards[0]} size={compact ? 'xs' : 'sm'} />
+              <PlayingCard card={showBluff.cards[1]} size={compact ? 'xs' : 'sm'} />
+            </div>
+          </div>
         )}
       </div>
 
@@ -242,7 +257,7 @@ export default function TableFelt({
                   width: compact ? 8 : 10,
                   height: compact ? 8 : 10,
                   borderRadius: '50%',
-                  background: 'radial-gradient(circle at 35% 35%, #f5d080, #b8860b)',
+                  background: 'radial-gradient(circle at 35% 35%, #e8c896, #a67c50)',
                   flexShrink: 0,
                 }}
               />

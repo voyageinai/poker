@@ -31,11 +31,17 @@ export function getStakeLevel(id: string): StakeLevel | undefined {
 /**
  * Bot pool per stake level — keys are system bot keys from SYSTEM_BOTS.
  * On each fill, bots are randomly shuffled from the pool.
+ *
+ * v3: all levels have access to ALL bots. Higher levels just weight toward
+ * more skilled styles. The shuffle in table-manager ensures variety.
+ * Users can never predict which bots will show up at any table.
  */
+const ALL_BOTS = ['house-nit', 'house-tag', 'house-lag', 'house-station', 'house-maniac', 'house-trapper', 'house-bully', 'house-tilter', 'house-shortstack', 'house-adaptive', 'house-gto'];
+
 export const LEVEL_BOT_POOL: Record<StakeLevelId, string[]> = {
-  micro: ['house-nit', 'house-tag', 'house-lag', 'house-station', 'house-maniac', 'house-trapper', 'house-bully', 'house-tilter', 'house-shortstack', 'house-adaptive', 'house-gto'],
-  low:   ['house-nit', 'house-tag', 'house-lag', 'house-station', 'house-maniac', 'house-trapper', 'house-bully', 'house-tilter', 'house-shortstack', 'house-adaptive', 'house-gto'],
-  mid:   ['house-tag', 'house-lag', 'house-maniac', 'house-trapper', 'house-bully', 'house-shortstack', 'house-adaptive', 'house-gto'],
-  high:   ['house-lag', 'house-maniac', 'house-trapper', 'house-shortstack', 'house-adaptive', 'house-gto'],
-  elite:  ['house-gto', 'house-adaptive', 'house-lag', 'house-maniac', 'house-trapper', 'house-shortstack'],
+  micro: ALL_BOTS,
+  low:   ALL_BOTS,
+  mid:   ALL_BOTS,
+  high:  ALL_BOTS,
+  elite: ALL_BOTS,
 };

@@ -13,10 +13,10 @@ interface ShowdownPanelProps {
 export default function ShowdownPanel({ showdown, winnerSeats, compact }: ShowdownPanelProps) {
   return (
     <div className={cn(
-      'shrink-0 rounded-lg border border-border-bright bg-bg-surface',
+      'shrink-0 rounded-lg border border-gold-dim/30 bg-bg-surface',
       compact ? 'p-1.5 bg-bg-surface/95 backdrop-blur-sm' : 'p-2',
     )}>
-      <div className={cn('font-bold text-text-primary', compact ? 'mb-1 text-[0.65rem]' : 'mb-[0.4rem] text-xs')}>摊牌</div>
+      <div className={cn('font-heading font-bold text-gold tracking-wider', compact ? 'mb-1 text-[0.65rem]' : 'mb-[0.4rem] text-xs')}>摊牌</div>
       <div className={cn('flex flex-col', compact ? 'gap-[0.2rem]' : 'gap-[0.35rem]')}>
         {showdown.map(result => {
           const isResultWinner = winnerSeats.has(result.seat);

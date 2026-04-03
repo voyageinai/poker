@@ -30,6 +30,7 @@ export default function TablePage() {
     actionRequest,
     showdown,
     lastWinners,
+    showBluff,
     busted,
     connected,
     error,
@@ -168,6 +169,7 @@ export default function TablePage() {
             myHoleCards={myHoleCards}
             showdown={showdown}
             lastWinners={lastWinners}
+            showBluff={showBluff}
             currentUserId={currentUserId}
             isSeated={isSeated}
             heroSeat={heroSeat}
@@ -313,6 +315,7 @@ export default function TablePage() {
             myHoleCards={myHoleCards}
             showdown={showdown}
             lastWinners={lastWinners}
+            showBluff={showBluff}
             currentUserId={currentUserId}
             isSeated={isSeated}
             heroSeat={heroSeat}

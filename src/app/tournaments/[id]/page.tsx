@@ -94,7 +94,7 @@ export default function TournamentDetailPage() {
         <ArrowLeft className="inline h-4 w-4" /> 锦标赛
       </Link>
 
-      <h1 className="mt-2 mb-1 text-2xl font-bold tracking-tight">
+      <h1 className="mt-2 mb-1 text-2xl font-heading font-bold tracking-wider">
         {data.name}
       </h1>
       <div className="flex flex-wrap gap-x-4 gap-y-1 md:gap-6 mb-6 text-[0.85rem] text-text-secondary">

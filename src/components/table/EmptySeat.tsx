@@ -50,7 +50,7 @@ export default function EmptySeat({ seatIndex, tableId, isSeated, onSitDown, com
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        className="flex cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-border-bright bg-bg-surface/40 text-text-muted transition-all hover:border-teal/50 hover:bg-bg-surface/70 hover:text-teal"
+        className="flex cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-gold-dim/40 bg-bg-surface/30 text-text-muted transition-all hover:border-gold/60 hover:bg-bg-surface/60 hover:text-gold hover:shadow-[0_0_12px_rgba(212,165,116,0.1)]"
         style={{ width: compact ? 44 : 52, height: compact ? 44 : 52 }}
       >
         <Plus className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />

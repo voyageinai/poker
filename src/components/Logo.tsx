@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Diamond } from 'lucide-react';
+import { Flame } from 'lucide-react';
 
 interface LogoProps {
   size?: 'sm' | 'lg';
@@ -10,16 +10,16 @@ export default function Logo({ size = 'sm' }: LogoProps) {
   return (
     <Link
       href="/"
-      className={`group mr-6 font-extrabold tracking-[0.12em] text-teal no-underline inline-flex items-center${size === 'lg' ? ' text-2xl' : ' text-base'}`}
+      className={`group mr-6 font-heading font-bold tracking-[0.15em] text-crimson no-underline inline-flex items-center${size === 'lg' ? ' text-2xl' : ' text-base'}`}
     >
-      <Diamond className={`inline ${iconSize} text-teal mr-1.5 shrink-0`} />
+      <Flame className={`inline ${iconSize} text-crimson mr-1.5 shrink-0`} />
       <span
-        className="group-hover:glow-text-teal transition-all"
+        className="group-hover:glow-text-crimson transition-all"
         style={{ animation: 'logo-glow-pulse 3s ease-in-out infinite' }}
       >
         德州
       </span>
-      <span className="text-amber group-hover:glow-text-amber transition-all ml-[0.15em]">
+      <span className="text-gold group-hover:glow-text-gold transition-all ml-[0.15em]">
         风云
       </span>
     </Link>

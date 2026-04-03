@@ -182,6 +182,10 @@ export function listTablesForLevel(level: string): DbTable[] {
   ).all(level) as DbTable[];
 }
 
+export function closeTable(id: string): void {
+  getDb().prepare("UPDATE poker_tables SET status = 'closed' WHERE id = ?").run(id);
+}
+
 /**
  * Daily chip refresh: if balance < 2000, set to 5000.
  * Idempotent per UTC calendar day via last_chip_refresh timestamp.

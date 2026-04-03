@@ -66,10 +66,35 @@ interface AdminBot {
   status: 'active' | 'disabled' | 'validating';
 }
 
-type Tab = 'overview' | 'users' | 'codes' | 'bots' | 'audit';
+interface AdminTableSeat {
+  seat: number;
+  displayName: string;
+  kind: 'human' | 'bot';
+  stack: number;
+  status: string;
+}
+
+interface AdminTableInfo {
+  id: string;
+  name: string;
+  level: string;
+  levelName: string;
+  smallBlind: number;
+  bigBlind: number;
+  maxSeats: number;
+  status: string;
+  handNumber: number;
+  pot: number;
+  players: AdminTableSeat[];
+  playerCount: number;
+  createdAt: number;
+}
+
+type Tab = 'overview' | 'tables' | 'users' | 'codes' | 'bots' | 'audit';
 
 const TAB_LABELS: Record<Tab, string> = {
   overview: '概览',
+  tables: '牌桌',
   users: '用户',
   codes: '兑换码',
   bots: 'Bot',
@@ -160,6 +185,164 @@ function OverviewTab() {
       )}
 
       <RecentHandsSection />
+    </div>
+  );
+}
+
+// ─── Tab: Tables ─────────────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  waiting: { label: '等待中', color: 'text-text-muted' },
+  starting: { label: '发牌中', color: 'text-amber' },
+  preflop: { label: '翻前', color: 'glow-text-win' },
+  flop: { label: '翻牌', color: 'glow-text-win' },
+  turn: { label: '转牌', color: 'glow-text-win' },
+  river: { label: '河牌', color: 'glow-text-win' },
+  showdown: { label: '摊牌', color: 'glow-text-amber' },
+  hand_complete: { label: '结算中', color: 'text-text-muted' },
+};
+
+function TablesTab() {
+  const [tables, setTables] = useState<AdminTableInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [closing, setClosing] = useState<string | null>(null);
+
+  const fetchTables = useCallback(() => {
+    fetch(withBasePath('/api/admin/tables'))
+      .then(r => r.json() as Promise<AdminTableInfo[]>)
+      .then(d => { setTables(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchTables();
+    const iv = setInterval(fetchTables, 5000);
+    return () => clearInterval(iv);
+  }, [fetchTables]);
+
+  async function handleClose(tableId: string) {
+    if (!confirm('确定强制关闭此桌？所有玩家筹码将退还。')) return;
+    setClosing(tableId);
+    try {
+      const res = await fetch(withBasePath(`/api/admin/tables/${tableId}/close`), { method: 'POST' });
+      if (!res.ok) {
+        const d = await res.json() as { error?: string };
+        throw new Error(d.error ?? '操作失败');
+      }
+      toast.success('桌子已关闭');
+      fetchTables();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setClosing(null);
+    }
+  }
+
+  if (loading) return <p className="text-text-muted py-8 text-center">加载中...</p>;
+
+  if (tables.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <p className="text-text-muted">当前没有活跃牌桌</p>
+      </div>
+    );
+  }
+
+  // Group by level
+  const grouped = new Map<string, AdminTableInfo[]>();
+  for (const t of tables) {
+    const key = t.level;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(t);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-text-muted">共 {tables.length} 张活跃桌</span>
+        <span className="text-sm text-text-muted">|</span>
+        <span className="text-sm text-text-muted">
+          {tables.reduce((s, t) => s + t.playerCount, 0)} 名玩家在线
+        </span>
+      </div>
+
+      {[...grouped.entries()].map(([level, levelTables]) => (
+        <div key={level}>
+          <h3 className="mb-3 text-sm font-semibold text-text-secondary">
+            {levelTables[0].levelName}
+            <span className="ml-2 font-normal text-text-muted">
+              ({levelTables[0].smallBlind}/{levelTables[0].bigBlind}) — {levelTables.length} 桌
+            </span>
+          </h3>
+
+          <div className="space-y-2">
+            {levelTables.map(t => {
+              const st = STATUS_LABELS[t.status] ?? { label: t.status, color: 'text-text-muted' };
+              return (
+                <Card key={t.id} className="border-[var(--border)] bg-bg-surface">
+                  <CardContent className="p-4">
+                    {/* Header row */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="mono text-sm text-text-primary">{t.name}</span>
+                      <Badge variant="outline" className={cn('text-xs', st.color)}>
+                        {st.label}
+                      </Badge>
+                      <span className="text-xs text-text-muted">
+                        第 {t.handNumber} 手
+                      </span>
+                      {t.pot > 0 && (
+                        <span className="text-xs text-text-muted">
+                          底池 <span className="mono text-amber">{t.pot.toLocaleString()}</span>
+                        </span>
+                      )}
+                      <span className="flex-1" />
+                      <span className="text-xs text-text-muted">
+                        {t.playerCount}/{t.maxSeats} 人
+                      </span>
+                      <Link href={`/table/${t.id}`}>
+                        <Button variant="ghost" size="xs">观战</Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="text-loss hover:text-loss"
+                        disabled={closing === t.id}
+                        onClick={() => handleClose(t.id)}
+                      >
+                        {closing === t.id ? '关闭中...' : '关桌'}
+                      </Button>
+                    </div>
+
+                    {/* Seat list */}
+                    <div className="flex flex-wrap gap-2">
+                      {t.players.map(p => (
+                        <div
+                          key={p.seat}
+                          className={cn(
+                            'flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs',
+                            p.kind === 'human'
+                              ? 'border-teal/30 bg-teal/5'
+                              : 'border-[var(--border)] bg-bg-surface',
+                          )}
+                        >
+                          <span className={p.kind === 'human' ? 'text-teal' : 'text-text-muted'}>
+                            #{p.seat}
+                          </span>
+                          <span className="text-text-secondary">{p.displayName}</span>
+                          <span className="mono text-amber">{p.stack.toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {t.playerCount === 0 && (
+                        <span className="text-xs text-text-muted">无玩家</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1042,6 +1225,7 @@ export default function AdminPage() {
       </div>
 
       {tab === 'overview' && <OverviewTab />}
+      {tab === 'tables'   && <TablesTab />}
       {tab === 'users'    && <UsersTab />}
       {tab === 'codes'    && <CodesTab />}
       {tab === 'bots'     && <BotsTab />}

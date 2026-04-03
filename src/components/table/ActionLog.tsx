@@ -41,10 +41,11 @@ export default function ActionLog({ entries, players }: ActionLogProps) {
   };
 
   return (
-    <div className="scanlines bg-[#060c14] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
+    <div className="scanlines bg-[#0c0c10] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
       {/* Header */}
-      <div className="px-[0.6rem] py-[0.4rem] border-b border-teal/20 font-semibold text-xs text-text-primary flex justify-between items-center shrink-0">
-        <span>实时操作</span>
+      <div className="relative px-3 py-2 font-semibold text-xs text-text-primary flex justify-between items-center shrink-0">
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-crimson/30 via-crimson/10 to-transparent" />
+        <span className="tracking-wider">实时操作</span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCompact(c => !c)}
@@ -63,7 +64,7 @@ export default function ActionLog({ entries, players }: ActionLogProps) {
       {/* Log entries */}
       <div ref={logRef} className="flex-1 overflow-y-auto text-xs">
         {/* Scroll-fade overlay at top */}
-        <div className="pointer-events-none sticky top-0 z-10 h-4 bg-gradient-to-b from-[#060c14] to-transparent" />
+        <div className="pointer-events-none sticky top-0 z-10 h-4 bg-gradient-to-b from-[#0c0c10] to-transparent" />
 
         {entries.map(entry => {
           if (entry.kind === 'new_hand') {
@@ -76,13 +77,13 @@ export default function ActionLog({ entries, players }: ActionLogProps) {
                 key={entry.id}
                 className="px-3 py-[0.35rem] flex flex-col gap-0.5"
               >
-                <div className="h-px bg-teal/30" />
+                <div className="h-px bg-crimson/30" />
                 <div className="text-center">
-                  <span className="text-[0.65rem] text-teal font-semibold">
+                  <span className="text-[0.65rem] text-crimson font-semibold font-heading tracking-wider">
                     {handNum ? `HAND #${handNum}` : entry.text}
                   </span>
                 </div>
-                <div className="h-px bg-teal/30" />
+                <div className="h-px bg-crimson/30" />
               </motion.div>
             );
           }
@@ -93,7 +94,7 @@ export default function ActionLog({ entries, players }: ActionLogProps) {
                 key={entry.id}
                 className="px-3 py-[0.2rem] bg-bg-base border-b border-[var(--border)] flex items-center gap-2"
               >
-                <span className="text-teal font-semibold text-xs">
+                <span className="text-gold font-semibold text-xs">
                   {STREET_NAMES[entry.street ?? ''] ?? entry.street}
                 </span>
                 <div className="flex gap-[3px]">

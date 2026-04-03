@@ -24,8 +24,8 @@ export const ACTION_LABELS: Record<string, string> = {
 export const ACTION_LOG_COLORS: Record<string, string> = {
   fold: 'var(--fold)',
   check: '#10b981',
-  call: 'var(--teal)',
-  raise: 'var(--amber)',
+  call: 'var(--crimson)',
+  raise: 'var(--gold)',
   allin: '#f87171',
 };
 

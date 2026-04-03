@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import '@fontsource-variable/inter';
+import '@fontsource-variable/cinzel';
+import '@fontsource-variable/outfit';
 import '@fontsource-variable/jetbrains-mono';
 import './globals.css';
 import { Toaster } from 'sonner';

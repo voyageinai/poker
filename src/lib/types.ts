@@ -78,6 +78,8 @@ export interface BotDebugInfo {
   raiseFreq?: number;
   /** free-form label, e.g. "Bluff", "Value bet", "Fold equity play" */
   reasoning?: string;
+  /** v3: if true, bot wants to "show bluff" when opponents fold */
+  showBluff?: boolean;
 }
 
 // ─── Table State Machine ──────────────────────────────────────────────────────
@@ -124,6 +126,7 @@ export type WsServerMessage =
   | { type: 'player_left'; seat: number }
   | { type: 'busted'; seat: number; canRebuy: boolean; timeoutSec: number }
   | { type: 'rebuy_success'; seat: number; stack: number }
+  | { type: 'show_bluff'; seat: number; cards: [Card, Card]; playerName: string }
   | { type: 'error'; message: string };
 
 // Client → Server

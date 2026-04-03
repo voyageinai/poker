@@ -219,7 +219,7 @@ export default function BotsPage() {
     <div className="py-5 md:py-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-5 md:mb-8">
         <div>
-          <h1 className="m-0 text-xl md:text-2xl font-bold tracking-tight">我的 Bot</h1>
+          <h1 className="m-0 text-xl md:text-2xl font-heading font-bold tracking-wider">我的 Bot</h1>
           <p className="mt-1 text-text-secondary text-xs md:text-sm">
             上传实现了 PBP 协议的可执行文件
           </p>

@@ -34,6 +34,7 @@ export function useTableWs(tableId: string) {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLog, setActionLog] = useState<LogEntry[]>([]);
+  const [showBluff, setShowBluff] = useState<{ seat: number; cards: [Card, Card]; playerName: string } | null>(null);
   const logIdRef = useRef(0);
   /** Track the last locally-pushed action to deduplicate WS echoes */
   const lastLocalAction = useRef<{ seat: number; action: string; amount: number } | null>(null);
@@ -116,6 +117,7 @@ export function useTableWs(tableId: string) {
                 pushLog({ kind: 'new_hand', text: `第 ${msg.state.handNumber} 局开始` });
                 setShowdown(null);
                 setLastWinners(null);
+                setShowBluff(null);
                 setIsReady(false);
                 setBusted(null);
               }
@@ -163,6 +165,10 @@ export function useTableWs(tableId: string) {
           case 'deal_board':
             pushLog({ kind: 'street', street: msg.street, cards: msg.cards });
             break;
+          case 'show_bluff':
+            setShowBluff({ seat: msg.seat, cards: msg.cards, playerName: msg.playerName });
+            pushLog({ kind: 'action', seat: msg.seat, action: 'raise' as ActionType, amount: 0, text: `${msg.playerName} 亮牌示威!` });
+            break;
           case 'player_joined':
           case 'player_left':
             break;
@@ -205,5 +211,5 @@ export function useTableWs(tableId: string) {
     });
   }, [sendMsg, pushLog]);
 
-  return { tableState, setTableState, myHoleCards, actionRequest, showdown, lastWinners, busted, connected, error, sendAction, sendMsg, actionLog, isReady, setIsReady };
+  return { tableState, setTableState, myHoleCards, actionRequest, showdown, lastWinners, showBluff, busted, connected, error, sendAction, sendMsg, actionLog, isReady, setIsReady };
 }

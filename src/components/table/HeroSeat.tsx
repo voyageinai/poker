@@ -25,8 +25,8 @@ export default function HeroSeat({
   const actionColors: Record<string, string> = {
     fold: 'var(--fold)',
     check: '#10b981',
-    call: 'var(--teal)',
-    raise: 'var(--amber)',
+    call: 'var(--crimson)',
+    raise: 'var(--gold)',
     allin: '#f87171',
   };
 
@@ -62,9 +62,9 @@ export default function HeroSeat({
         ...(isAllIn
           ? {
               boxShadow: [
-                '0 0 6px rgba(245,158,11,0.3)',
-                '0 0 14px rgba(245,158,11,0.5)',
-                '0 0 6px rgba(245,158,11,0.3)',
+                '0 0 6px rgba(220,38,38,0.3)',
+                '0 0 14px rgba(220,38,38,0.5)',
+                '0 0 6px rgba(220,38,38,0.3)',
               ],
             }
           : isWinner
@@ -89,27 +89,66 @@ export default function HeroSeat({
         animation: isActive && !isAllIn ? 'pulse-border 1.5s ease-in-out infinite' : undefined,
       }}
     >
-      {/* Left: name + stack + health bar */}
+      {/* Left: avatar + name + stack + health bar */}
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
         <div className="flex items-center gap-1.5">
+          {/* Hero avatar — 28px, gold border, pulses when active */}
+          <div className="relative shrink-0" style={{ width: 28, height: 28 }}>
+            <div
+              className="w-full h-full rounded-full flex items-center justify-center bg-[rgba(212,165,116,0.15)] border-2 border-[rgba(212,165,116,0.40)]"
+              style={{
+                animation: isActive && !isAllIn ? 'pulse-border 1.5s ease-in-out infinite' : undefined,
+              }}
+            >
+              <span className="text-[0.55rem] font-bold leading-none select-none text-[var(--gold)]">
+                {player.displayName.charAt(0)}
+              </span>
+            </div>
+            {/* Position badge overlay — D > S > B */}
+            {player.isButton ? (
+              <span
+                className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full font-black leading-none"
+                style={{
+                  width: 12,
+                  height: 12,
+                  fontSize: '0.4rem',
+                  background: 'var(--gold)',
+                  color: 'var(--bg-base)',
+                }}
+              >
+                D
+              </span>
+            ) : player.isSB ? (
+              <span
+                className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full font-black leading-none"
+                style={{
+                  width: 12,
+                  height: 12,
+                  fontSize: '0.4rem',
+                  background: 'rgba(220,38,38,0.80)',
+                  color: 'white',
+                }}
+              >
+                S
+              </span>
+            ) : player.isBB ? (
+              <span
+                className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full font-black leading-none"
+                style={{
+                  width: 12,
+                  height: 12,
+                  fontSize: '0.4rem',
+                  background: 'var(--text-muted)',
+                  color: 'var(--bg-base)',
+                }}
+              >
+                B
+              </span>
+            ) : null}
+          </div>
           <span className="text-[0.75rem] font-semibold text-amber truncate max-w-[100px]">
             {player.displayName}
           </span>
-          {player.isButton && (
-            <span className="text-[0.5rem] bg-[rgba(245,158,11,0.25)] text-amber px-0.5 rounded-[2px] font-bold leading-tight">
-              D
-            </span>
-          )}
-          {player.isSB && (
-            <span className="text-[0.5rem] bg-[rgba(0,180,216,0.2)] text-teal px-0.5 rounded-[2px] font-bold leading-tight">
-              S
-            </span>
-          )}
-          {player.isBB && (
-            <span className="text-[0.5rem] bg-[rgba(100,116,139,0.25)] text-text-secondary px-0.5 rounded-[2px] font-bold leading-tight">
-              B
-            </span>
-          )}
           {player.lastAction && (
             <span
               className="text-[0.6rem] px-1 py-0 rounded-[3px] font-bold"
@@ -126,15 +165,16 @@ export default function HeroSeat({
         {/* Health bar */}
         <div
           className="w-full rounded-full overflow-hidden"
-          style={{ height: 3, background: 'rgba(255,255,255,0.08)' }}
+          style={{ height: 4, background: 'rgba(255,255,255,0.06)' }}
         >
           <div
             style={{
               height: '100%',
               width: `${stackRatio * 100}%`,
-              background: healthColor,
+              background: `linear-gradient(90deg, ${healthColor}88, ${healthColor})`,
               transition: 'width 0.4s ease, background 0.4s ease',
               borderRadius: 9999,
+              boxShadow: `1px 0 4px ${healthColor}`,
             }}
           />
         </div>

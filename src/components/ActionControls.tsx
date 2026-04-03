@@ -4,6 +4,25 @@ import type { PokerAction } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+// Chip-shaped quick-bet button
+function ChipButton({ label, onClick, compact }: { label: string; onClick: () => void; compact?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex items-center justify-center rounded-full',
+        'bg-bg-card border border-gold-dim/30',
+        'text-gold font-bold',
+        'hover:border-gold/50 hover:bg-gold/8',
+        'active:scale-95 transition-transform duration-75',
+        compact ? 'w-9 h-9 text-[0.6rem]' : 'w-10 h-10 text-[0.65rem]'
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
 interface Props {
   toCall: number;
   minRaise: number;
@@ -72,73 +91,103 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
               max={maxRaiseTotal > minRaiseTotal ? maxRaiseTotal : minRaiseTotal}
               value={raiseAmount}
               onChange={e => setRaiseAmount(Number(e.target.value))}
-              className="mobile-slider flex-1 appearance-none accent-amber cursor-pointer h-8"
-              style={{ touchAction: 'none' }}
+              className="mobile-slider flex-1 appearance-none cursor-pointer h-8"
+              style={{ touchAction: 'none', accentColor: 'var(--gold)' }}
             />
-            <span className="mono text-sm font-bold text-amber min-w-[48px] text-right">{raiseAmount}</span>
+            <span className="mono text-sm font-bold text-gold min-w-[48px] text-right">{raiseAmount}</span>
           </div>
         )}
 
-        {/* Quick-bet presets — smaller pills */}
+        {/* Quick-bet presets — chip shaped, centered */}
         {canShowSlider && (
-          <div className="flex gap-1">
+          <div className="flex justify-center gap-2">
             {QUICK_BETS.map(({ label, mult }) => (
-              <Button
+              <ChipButton
                 key={label}
-                variant="ghost"
-                size="xs"
-                className="flex-1 text-[0.65rem] h-9 active:translate-y-px active:brightness-90"
+                label={label}
+                compact
                 onClick={() => {
                   const raiseSize = Math.round(pot * mult);
                   const raiseTo = currentBet + raiseSize;
                   setRaiseAmount(Math.min(Math.max(raiseTo, minRaiseTotal), maxRaiseTotal));
                 }}
-              >
-                {label}
-              </Button>
+              />
             ))}
           </div>
         )}
 
-        {/* Action buttons — full width row */}
-        <div className="flex gap-2">
-          <Button
-            variant="destructive"
-            className="flex-1 h-11 text-sm font-bold active:translate-y-px active:brightness-90"
-            onClick={() => onAction({ action: 'fold' })}
-          >
-            弃牌
-          </Button>
-
-          {canCheck ? (
-            <Button
-              variant="ghost"
-              className="flex-1 h-11 text-sm font-bold border border-[var(--border)] active:translate-y-px active:brightness-90"
-              onClick={() => onAction({ action: 'check' })}
-            >
-              过牌
-            </Button>
-          ) : (
-            <Button
-              variant="teal"
-              className="flex-1 h-11 text-sm font-bold active:translate-y-px active:brightness-90"
-              disabled={!canCall}
-              onClick={() => onAction({ action: 'call' })}
-            >
-              跟注 {callAmount}
-            </Button>
-          )}
-
-          {isAllIn ? (
-            <Button
-              variant="amber"
-              className="flex-1 h-11 text-sm font-extrabold uppercase tracking-wide glow-text-amber active:translate-y-px active:brightness-90"
-              style={{ boxShadow: 'var(--glow-amber)' }}
+        {/* Action buttons — when ALL-IN, it takes full bottom row */}
+        {isAllIn ? (
+          <>
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                className="flex-1 h-11 text-sm font-bold active:translate-y-px active:brightness-90"
+                onClick={() => onAction({ action: 'fold' })}
+              >
+                弃牌
+              </Button>
+              {canCheck ? (
+                <Button
+                  variant="ghost"
+                  className="flex-1 h-11 text-sm font-bold border border-[var(--border)] active:translate-y-px active:brightness-90"
+                  onClick={() => onAction({ action: 'check' })}
+                >
+                  过牌
+                </Button>
+              ) : (
+                <Button
+                  variant="teal"
+                  className="flex-1 h-11 text-sm font-bold active:translate-y-px active:brightness-90"
+                  disabled={!canCall}
+                  onClick={() => onAction({ action: 'call' })}
+                >
+                  跟注 {callAmount}
+                </Button>
+              )}
+            </div>
+            <button
+              className={cn(
+                'w-full h-12 rounded-md',
+                'bg-gradient-to-b from-[#ef4444] to-[#dc2626]',
+                'text-white text-lg font-black tracking-widest',
+                'shadow-[0_0_16px_rgba(220,38,38,0.3)]',
+                'animate-pulse-subtle',
+                'active:scale-[0.98] active:brightness-90 transition-transform duration-75'
+              )}
+              style={{ boxShadow: '0 0 16px rgba(220,38,38,0.3), 0 0 32px rgba(220,38,38,0.15)' }}
               onClick={() => onAction({ action: 'allin' })}
             >
               ALL-IN {stack}
+            </button>
+          </>
+        ) : (
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              className="flex-1 h-11 text-sm font-bold active:translate-y-px active:brightness-90"
+              onClick={() => onAction({ action: 'fold' })}
+            >
+              弃牌
             </Button>
-          ) : (
+            {canCheck ? (
+              <Button
+                variant="ghost"
+                className="flex-1 h-11 text-sm font-bold border border-[var(--border)] active:translate-y-px active:brightness-90"
+                onClick={() => onAction({ action: 'check' })}
+              >
+                过牌
+              </Button>
+            ) : (
+              <Button
+                variant="teal"
+                className="flex-1 h-11 text-sm font-bold active:translate-y-px active:brightness-90"
+                disabled={!canCall}
+                onClick={() => onAction({ action: 'call' })}
+              >
+                跟注 {callAmount}
+              </Button>
+            )}
             <Button
               variant="amber"
               className="flex-1 h-11 text-sm font-bold active:translate-y-px active:brightness-90"
@@ -147,8 +196,8 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
             >
               加注 {raiseAmount}
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -161,35 +210,32 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
           <div className="flex items-center justify-between">
             <span className="text-[0.65rem] text-text-muted">加注到</span>
-            <span className="mono text-[0.85rem] font-bold text-amber">{raiseAmount}</span>
+            <span className="mono font-heading text-[0.95rem] font-bold text-gold">{raiseAmount}</span>
           </div>
-          {/* Range input with amber glow wrapper */}
-          <div className="rounded bg-amber/5 p-1">
+          {/* Range input with gold accent */}
+          <div className="rounded bg-gold/5 p-1">
             <input
               type="range"
               min={minRaiseTotal}
               max={maxRaiseTotal > minRaiseTotal ? maxRaiseTotal : minRaiseTotal}
               value={raiseAmount}
               onChange={e => setRaiseAmount(Number(e.target.value))}
-              className="w-full appearance-none accent-amber cursor-pointer"
+              className="w-full appearance-none cursor-pointer"
+              style={{ accentColor: 'var(--gold)' }}
             />
           </div>
-          {/* 5 quick-bet presets */}
-          <div className="flex gap-1">
+          {/* 5 chip-shaped quick-bet presets */}
+          <div className="flex justify-between px-0.5">
             {QUICK_BETS.map(({ label, mult }) => (
-              <Button
+              <ChipButton
                 key={label}
-                variant="ghost"
-                size="xs"
-                className="flex-1 text-[0.6rem] active:translate-y-px active:brightness-90"
+                label={label}
                 onClick={() => {
                   const raiseSize = Math.round(pot * mult);
                   const raiseTo = currentBet + raiseSize;
                   setRaiseAmount(Math.min(Math.max(raiseTo, minRaiseTotal), maxRaiseTotal));
                 }}
-              >
-                {label}
-              </Button>
+              />
             ))}
           </div>
           {/* Timer bar */}
@@ -201,11 +247,11 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
       <div className={cn('flex flex-col gap-1', canShowSlider ? 'w-[130px] shrink-0' : 'w-full')}>
         {!canShowSlider && <TimerBar pct={pct} urgent={urgent} remaining={remaining} />}
 
-        {/* Fold — left accent bar */}
+        {/* Fold */}
         <Button
           variant="destructive"
           size="sm"
-          className="border-l-2 border-loss text-xs active:translate-y-px active:brightness-90"
+          className="h-8 border-l-2 border-loss text-xs active:translate-y-px active:brightness-90"
           onClick={() => onAction({ action: 'fold' })}
         >
           弃牌
@@ -215,7 +261,7 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
           <Button
             variant="ghost"
             size="sm"
-            className="text-xs active:translate-y-px active:brightness-90"
+            className="h-8 text-xs active:translate-y-px active:brightness-90"
             onClick={() => onAction({ action: 'check' })}
           >
             过牌
@@ -224,7 +270,7 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
           <Button
             variant="teal"
             size="sm"
-            className="text-xs active:translate-y-px active:brightness-90"
+            className="h-8 text-xs active:translate-y-px active:brightness-90"
             disabled={!canCall}
             onClick={() => onAction({ action: 'call' })}
           >
@@ -233,20 +279,23 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
         )}
 
         {isAllIn ? (
-          <Button
-            variant="amber"
-            size="sm"
-            className="glow-text-amber text-xs font-extrabold uppercase tracking-wide active:translate-y-px active:brightness-90"
-            style={{ boxShadow: 'var(--glow-amber)' }}
+          <button
+            className={cn(
+              'w-full h-10 rounded-md',
+              'bg-gradient-to-b from-[#ef4444] to-[#dc2626]',
+              'text-white text-base font-black tracking-widest',
+              'active:scale-[0.98] active:brightness-90 transition-transform duration-75'
+            )}
+            style={{ boxShadow: '0 0 16px rgba(220,38,38,0.3), 0 0 32px rgba(220,38,38,0.15)' }}
             onClick={() => onAction({ action: 'allin' })}
           >
             ALL-IN {stack}
-          </Button>
+          </button>
         ) : (
           <Button
             variant="amber"
             size="sm"
-            className="text-xs active:translate-y-px active:brightness-90"
+            className="h-8 text-xs active:translate-y-px active:brightness-90"
             disabled={!canRaise}
             onClick={() => onAction({ action: 'raise', amount: raiseAmount })}
           >
@@ -260,16 +309,16 @@ export default function ActionControls({ toCall, minRaise, stack, currentBet, po
 
 function TimerBar({ pct, urgent, remaining }: { pct: number; urgent: boolean; remaining: number }) {
   return (
-    <div className="mt-0.5 flex items-center gap-1.5">
-      <div className="h-1.5 flex-1 overflow-hidden rounded-sm bg-bg-base">
+    <div className="mt-0.5 flex items-center gap-2">
+      <div className="h-[5px] flex-1 overflow-hidden rounded-full bg-bg-base">
         <div
           className={cn(
-            'h-full rounded-sm transition-[width] duration-100 ease-linear',
-            urgent ? 'bg-loss' : 'bg-teal'
+            'h-full rounded-full transition-[width] duration-100 ease-linear',
+            urgent ? 'bg-gradient-to-r from-loss/80 to-loss' : 'bg-gradient-to-r from-crimson-dim to-crimson'
           )}
           style={{
             width: `${pct}%`,
-            boxShadow: urgent ? '0 0 6px var(--loss)' : undefined,
+            boxShadow: urgent ? '0 0 8px var(--loss), 2px 0 4px var(--loss)' : '2px 0 4px var(--crimson-glow)',
           }}
         />
       </div>

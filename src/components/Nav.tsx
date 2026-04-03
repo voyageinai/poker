@@ -23,7 +23,10 @@ export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <nav className="flex h-11 md:h-10 items-center gap-2 border-b border-[var(--border)] bg-bg-base px-3 md:px-4">
+    <nav className="glass relative flex h-12 md:h-11 items-center gap-3 px-4 md:px-6">
+      {/* Gold gradient bottom border */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold-dim/50 to-transparent" />
+
       <Logo />
 
       {!isMobile && links.map(({ href, label }) => {
@@ -33,17 +36,17 @@ export default function Nav() {
             key={href}
             href={href}
             className={cn(
-              'relative rounded px-2 py-1 text-[0.85rem] no-underline transition-colors',
+              'relative rounded px-2.5 py-1 text-[0.85rem] no-underline transition-colors tracking-wide',
               active
-                ? 'font-medium text-teal'
-                : 'font-normal text-text-muted hover:text-text-primary'
+                ? 'font-semibold text-text-primary'
+                : 'font-normal text-text-muted hover:text-text-secondary'
             )}
           >
             {label}
             {active && (
               <motion.div
                 layoutId="nav-indicator"
-                className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-teal"
+                className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full bg-crimson"
               />
             )}
           </Link>
@@ -60,6 +63,18 @@ export default function Nav() {
 /** Dispatch this event from anywhere to refresh the Nav chip display. */
 export function refreshNavChips() {
   window.dispatchEvent(new Event('chips-changed'));
+}
+
+function ChipBadge({ chips }: { chips: number }) {
+  return (
+    <span className="mono text-[0.8rem] font-bold text-gold bg-gold/5 border border-gold-dim/30 rounded-full px-2.5 py-0.5 inline-flex items-center gap-1.5">
+      <span
+        className="inline-block w-2 h-2 rounded-full shrink-0"
+        style={{ background: 'radial-gradient(circle at 35% 35%, #e8c896, #a67c50)' }}
+      />
+      {chips.toLocaleString()}
+    </span>
+  );
 }
 
 function MobileAuthArea({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v: boolean) => void }) {
@@ -94,7 +109,7 @@ function MobileAuthArea({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuO
 
   return (
     <div className="flex items-center gap-2">
-      <span className="mono text-[0.8rem] font-semibold text-amber">{user.chips.toLocaleString()}</span>
+      <ChipBadge chips={user.chips} />
       <button
         onClick={() => setMenuOpen(!menuOpen)}
         className="flex h-9 w-9 items-center justify-center rounded border-none bg-transparent text-text-primary"
@@ -109,13 +124,13 @@ function MobileAuthArea({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuO
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
-            className="fixed left-0 right-0 top-11 z-50 border-b border-[var(--border)] bg-bg-surface px-4 py-3"
+            className="glass fixed left-0 right-0 top-12 z-50 border-b border-gold-dim/20 px-4 py-3"
           >
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between py-1">
-                <span className="text-sm font-medium text-text-primary">{user.username}</span>
+                <span className="text-sm font-semibold text-text-primary">{user.username}</span>
                 {user.role === 'admin' && (
-                  <Link href="/admin" className="text-xs text-amber no-underline" onClick={() => setMenuOpen(false)}>
+                  <Link href="/admin" className="text-xs text-gold no-underline" onClick={() => setMenuOpen(false)}>
                     管理
                   </Link>
                 )}
@@ -239,11 +254,11 @@ function AuthArea() {
     return (
       <div className="flex items-center gap-3">
         {user.role === 'admin' && (
-          <Link href="/admin" className="text-[0.8rem] text-amber no-underline hover:text-amber/80">
+          <Link href="/admin" className="text-[0.8rem] text-gold no-underline hover:text-gold/80 tracking-wide">
             管理
           </Link>
         )}
-        <span className="mono text-[0.8rem] font-semibold text-amber">{user.chips.toLocaleString()}</span>
+        <ChipBadge chips={user.chips} />
 
         {showRedeem ? (
           <form onSubmit={handleRedeem} className="flex items-center gap-1">

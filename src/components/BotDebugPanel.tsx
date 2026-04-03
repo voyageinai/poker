@@ -19,9 +19,9 @@ function inferStrategy(reasoning: string): { label: string; color: string; borde
   if (r.includes('value') || r.includes('价值'))
     return { label: 'VALUE', color: 'text-win', borderColor: 'rgba(34,197,94,0.4)', bgColor: 'rgba(34,197,94,0.12)' };
   if (r.includes('fold equity') || r.includes('弃牌权益'))
-    return { label: 'FOLD EQ', color: 'text-amber', borderColor: 'rgba(245,158,11,0.4)', bgColor: 'rgba(245,158,11,0.12)' };
+    return { label: 'FOLD EQ', color: 'text-amber', borderColor: 'rgba(212,165,116,0.4)', bgColor: 'rgba(212,165,116,0.12)' };
   if (r.includes('semi-bluff') || r.includes('半诈唬'))
-    return { label: 'SEMI-BLUFF', color: 'text-amber', borderColor: 'rgba(245,158,11,0.4)', bgColor: 'rgba(245,158,11,0.12)' };
+    return { label: 'SEMI-BLUFF', color: 'text-amber', borderColor: 'rgba(212,165,116,0.4)', bgColor: 'rgba(212,165,116,0.12)' };
   if (r.includes('check') || r.includes('过牌'))
     return { label: 'CHECK', color: 'text-fold', borderColor: 'rgba(100,116,139,0.4)', bgColor: 'rgba(100,116,139,0.12)' };
   return null;
@@ -29,9 +29,9 @@ function inferStrategy(reasoning: string): { label: string; color: string; borde
 
 // RGB values for heatmap cells (no alpha, applied separately)
 const ACTION_COLOR_RGB: Record<string, string> = {
-  '弃牌': '100,116,139',  // fold slate
-  '跟注': '0,180,216',    // teal
-  '加注': '245,158,11',   // amber
+  '弃牌': '107,101,112',  // fold warm gray
+  '跟注': '220,38,38',    // crimson
+  '加注': '212,165,116',  // gold
 };
 
 const ACTION_CSS_VAR: Record<string, string> = {
@@ -44,7 +44,7 @@ export default function BotDebugPanel({ info, botName }: Props) {
   const strategy = info?.reasoning ? inferStrategy(info.reasoning) : null;
 
   return (
-    <div className="scanlines rounded-md border border-[rgba(0,180,216,0.15)] bg-[#080e16] p-3 font-mono text-sm">
+    <div className="scanlines rounded-md border border-[rgba(220,38,38,0.15)] bg-[#0c0c10] p-3 font-mono text-sm">
       {/* Header with strategy badge */}
       <div className="mb-2 flex items-center justify-between">
         <span className="glow-text-teal flex items-center gap-1 font-semibold text-teal">
@@ -152,7 +152,7 @@ export default function BotDebugPanel({ info, botName }: Props) {
           {/* Reasoning — terminal style with blinking cursor */}
           {info.reasoning && (
             <div
-              className="blink-cursor rounded-r bg-[#060c14] border-l-2 border-teal px-2 py-1.5 text-xs text-text-secondary"
+              className="blink-cursor rounded-r bg-[#0c0c10] border-l-2 border-teal px-2 py-1.5 text-xs text-text-secondary"
             >
               {info.reasoning}
             </div>

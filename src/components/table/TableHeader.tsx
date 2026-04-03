@@ -30,9 +30,10 @@ export default function TableHeader({
 }: TableHeaderProps) {
   if (compact) {
     return (
-      <div className="flex items-center gap-2 bg-bg-surface border-b border-[var(--border)] px-3 py-1.5 shrink-0">
-        <span className="mono text-teal font-bold text-xs">#{tableState.handNumber}</span>
-        <span className="text-amber font-semibold text-xs">
+      <div className="glass relative flex items-center gap-2 border-b border-[var(--border)] px-3 py-1.5 shrink-0">
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold-dim/30 to-transparent" />
+        <span className="mono text-crimson font-bold text-xs font-heading tracking-wider">#{tableState.handNumber}</span>
+        <span className="text-gold font-semibold text-xs">
           {STATUS_LABELS[tableState.status] ?? tableState.status}
         </span>
         <div className="flex-1" />
@@ -61,18 +62,19 @@ export default function TableHeader({
   }
 
   return (
-    <div className="flex items-center gap-3 bg-bg-surface border border-[var(--border)] rounded-lg px-3 py-[0.4rem] flex-wrap shrink-0">
+    <div className="glass relative flex items-center gap-3 rounded-lg px-4 py-2 flex-wrap shrink-0">
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold-dim/30 to-transparent rounded-b-lg" />
       <div>
-        <span className="mono text-text-muted text-[0.65rem]">桌子</span>
+        <span className="text-text-muted text-[0.65rem]">桌子</span>
         <span className="ml-1 font-semibold text-text-primary text-[0.8rem]">{tableId.slice(0, 8)}</span>
       </div>
-      <div className="w-px h-4 bg-[var(--border)]" />
+      <div className="w-px h-4 bg-[var(--border-bright)]" />
       <div>
-        <span className="mono text-text-muted text-[0.65rem]">牌局</span>
-        <span className="mono ml-1 text-teal font-bold text-[0.8rem]">#{tableState.handNumber}</span>
+        <span className="text-text-muted text-[0.65rem]">牌局</span>
+        <span className="mono ml-1 text-crimson font-bold text-[0.8rem] font-heading tracking-wider">#{tableState.handNumber}</span>
       </div>
-      <div className="w-px h-4 bg-[var(--border)]" />
-      <span className="text-amber font-semibold text-[0.75rem]">
+      <div className="w-px h-4 bg-[var(--border-bright)]" />
+      <span className="text-gold font-semibold text-[0.75rem]">
         {STATUS_LABELS[tableState.status] ?? tableState.status}
       </span>
       <div className="flex-1" />
@@ -89,7 +91,7 @@ export default function TableHeader({
       {sitDownError && (
         <span className="text-[0.65rem] text-loss">{sitDownError}</span>
       )}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <div
           className="w-[6px] h-[6px] rounded-full"
           style={{

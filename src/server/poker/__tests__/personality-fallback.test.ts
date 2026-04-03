@@ -157,7 +157,8 @@ describe('heuristic personality lines', () => {
       },
     );
 
-    expect(['raise', 'allin']).toContain(action.action);
+    // v3: trapper with higher looseness/stickiness may call instead of check-raise at low strength
+    expect(['raise', 'allin', 'call']).toContain(action.action);
   });
 
   it('nit no longer auto-jams every medium-strength low-SPR cbet spot', () => {

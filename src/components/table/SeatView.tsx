@@ -5,7 +5,7 @@ import PlayingCard from '@/components/PlayingCard';
 import type { ClientPlayerState, Card } from '@/lib/types';
 import { ACTION_LABELS } from '@/components/table/constants';
 import { cn } from '@/lib/utils';
-import { Star } from 'lucide-react';
+import { Star, Hexagon } from 'lucide-react';
 
 interface SeatViewProps {
   player: ClientPlayerState;
@@ -31,8 +31,8 @@ export default function SeatView({
   const actionColors: Record<string, string> = {
     fold: 'var(--fold)',
     check: '#10b981',
-    call: 'var(--teal)',
-    raise: 'var(--amber)',
+    call: 'var(--crimson)',
+    raise: 'var(--gold)',
     allin: '#f87171',
   };
 
@@ -81,9 +81,9 @@ export default function SeatView({
         ...(isAllIn
           ? {
               boxShadow: [
-                '0 0 6px rgba(245,158,11,0.3)',
-                '0 0 14px rgba(245,158,11,0.5)',
-                '0 0 6px rgba(245,158,11,0.3)',
+                '0 0 6px rgba(220,38,38,0.3)',
+                '0 0 14px rgba(220,38,38,0.5)',
+                '0 0 6px rgba(220,38,38,0.3)',
               ],
             }
           : isWinner
@@ -115,50 +115,127 @@ export default function SeatView({
         animation: isActive && !isAllIn ? 'pulse-border 1.5s ease-in-out infinite' : undefined,
       }}
     >
-      {/* Name row */}
-      <div className="flex justify-between items-center">
-        <span
-          className={cn(
-            'font-semibold overflow-hidden text-ellipsis whitespace-nowrap leading-tight',
-            compact ? (is9Max ? 'text-[0.55rem]' : 'text-[0.6rem]') : 'text-xs',
-            isMe ? 'text-amber' : 'text-text-primary',
-            compact ? (is9Max ? 'max-w-[36px]' : 'max-w-[48px]') : (isMe ? 'max-w-[120px]' : 'max-w-[70px]'),
-          )}
-        >
-          {player.displayName}
-        </span>
-        <div className="flex gap-px items-center">
-          {player.isButton && (
-            <span className={cn(compact ? 'text-[0.4rem]' : 'text-[0.6rem]', 'bg-[rgba(245,158,11,0.25)] text-amber px-0.5 rounded-[2px] font-bold leading-tight')}>
-              D
-            </span>
-          )}
-          {player.isSB && !compact && (
-            <span className="text-[0.6rem] bg-[rgba(0,180,216,0.2)] text-teal px-0.5 rounded-[2px] font-bold leading-tight">
-              S
-            </span>
-          )}
-          {player.isBB && !compact && (
-            <span className="text-[0.6rem] bg-[rgba(100,116,139,0.25)] text-text-secondary px-0.5 rounded-[2px] font-bold leading-tight">
-              B
-            </span>
-          )}
+      {/* Name row — compact: plain text + inline badges; desktop: avatar circle + overlaid position dot */}
+      {compact ? (
+        <div className="flex justify-between items-center">
+          <span
+            className={cn(
+              'font-semibold overflow-hidden text-ellipsis whitespace-nowrap leading-tight',
+              is9Max ? 'text-[0.55rem]' : 'text-[0.6rem]',
+              isMe ? 'text-amber' : 'text-text-primary',
+              is9Max ? 'max-w-[36px]' : 'max-w-[48px]',
+            )}
+          >
+            {player.displayName}
+          </span>
+          <div className="flex gap-px items-center">
+            {player.isButton && (
+              <span className="text-[0.4rem] bg-[rgba(212,165,116,0.2)] text-amber px-0.5 rounded-[2px] font-bold leading-tight">
+                D
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          {/* Avatar circle with position badge overlay */}
+          <div className="relative shrink-0" style={{ width: 24, height: 24 }}>
+            <div
+              className={cn(
+                'w-full h-full rounded-full flex items-center justify-center',
+                player.kind === 'bot'
+                  ? 'bg-[rgba(220,38,38,0.12)] border border-[rgba(220,38,38,0.25)]'
+                  : isMe
+                  ? 'bg-[rgba(212,165,116,0.10)] border-2 border-[rgba(212,165,116,0.40)]'
+                  : 'bg-[rgba(212,165,116,0.10)] border border-[rgba(212,165,116,0.25)]',
+              )}
+            >
+              {player.kind === 'bot' ? (
+                <Hexagon
+                  size={11}
+                  className="text-[var(--crimson)] opacity-70"
+                  strokeWidth={2}
+                />
+              ) : (
+                <span
+                  className={cn(
+                    'text-[0.5rem] font-bold leading-none select-none',
+                    isMe ? 'text-[var(--gold)]' : 'text-[var(--gold)]',
+                  )}
+                >
+                  {player.displayName.charAt(0)}
+                </span>
+              )}
+            </div>
+            {/* Position badge — D > S > B, single dot overlaid bottom-right */}
+            {player.isButton ? (
+              <span
+                className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full font-black leading-none"
+                style={{
+                  width: 12,
+                  height: 12,
+                  fontSize: '0.4rem',
+                  background: 'var(--gold)',
+                  color: 'var(--bg-base)',
+                }}
+              >
+                D
+              </span>
+            ) : player.isSB ? (
+              <span
+                className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full font-black leading-none"
+                style={{
+                  width: 12,
+                  height: 12,
+                  fontSize: '0.4rem',
+                  background: 'rgba(220,38,38,0.80)',
+                  color: 'white',
+                }}
+              >
+                S
+              </span>
+            ) : player.isBB ? (
+              <span
+                className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full font-black leading-none"
+                style={{
+                  width: 12,
+                  height: 12,
+                  fontSize: '0.4rem',
+                  background: 'var(--text-muted)',
+                  color: 'var(--bg-base)',
+                }}
+              >
+                B
+              </span>
+            ) : null}
+          </div>
+          {/* Name */}
+          <span
+            className={cn(
+              'font-semibold overflow-hidden text-ellipsis whitespace-nowrap leading-tight text-xs',
+              isMe ? 'text-amber' : 'text-text-primary',
+              isMe ? 'max-w-[120px]' : 'max-w-[70px]',
+            )}
+          >
+            {player.displayName}
+          </span>
+        </div>
+      )}
 
       {/* Health bar — hero only */}
       {isMe && (
         <div
           className="w-full rounded-full overflow-hidden"
-          style={{ height: compact ? 2 : 3, background: 'rgba(255,255,255,0.08)' }}
+          style={{ height: compact ? 2 : 4, background: 'rgba(255,255,255,0.06)' }}
         >
           <div
             style={{
               height: '100%',
               width: `${stackRatio * 100}%`,
-              background: healthColor,
+              background: `linear-gradient(90deg, ${healthColor}88, ${healthColor})`,
               transition: 'width 0.4s ease, background 0.4s ease',
               borderRadius: 9999,
+              boxShadow: `1px 0 4px ${healthColor}`,
             }}
           />
         </div>

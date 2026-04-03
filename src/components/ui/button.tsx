@@ -21,9 +21,11 @@ const buttonVariants = cva(
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
         teal:
-          "bg-teal-dim text-white border-teal hover:bg-teal hover:shadow-[0_0_12px_var(--teal-glow)] transition-all",
+          "bg-gradient-to-b from-[var(--crimson)] to-[var(--crimson-dim)] text-white border-crimson-dim/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] hover:from-[#ef4444] hover:to-[var(--crimson)] hover:shadow-[0_0_20px_rgba(220,38,38,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all",
         amber:
-          "bg-amber-dim text-white border-amber hover:bg-amber hover:shadow-[0_0_12px_var(--amber-glow)] transition-all",
+          "bg-gradient-to-b from-[var(--gold)] to-[var(--gold-dim)] text-[#0a0a0f] font-semibold border-gold-dim/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] hover:from-[#e8c896] hover:to-[var(--gold)] hover:shadow-[0_0_20px_rgba(212,165,116,0.3),inset_0_1px_0_rgba(255,255,255,0.15)] transition-all",
+        ivory:
+          "bg-[var(--text-primary)] text-[var(--bg-base)] font-semibold border-[var(--text-primary)]/20 shadow-[0_1px_2px_rgba(0,0,0,0.2)] hover:bg-[#e8dcc8] hover:shadow-[0_2px_12px_rgba(240,232,218,0.15)] active:bg-[#ddd0ba] transition-all",
       },
       size: {
         default:

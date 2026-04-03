@@ -66,27 +66,38 @@ const RANK_ORDER = '23456789TJQKA';
 // 燕青 shortstack: "以小博大全下逼迫" → 紧范围，高加注（push/fold）
 // 曹操 adaptive:  "观察弱点精准剥削" → 基线同GTO，靠 safe-exploit 系统偏移
 // 诸葛亮 gto:     "攻守完美平衡" → 零偏移
+// v3.3: fix three problems:
+// 1) Big hands folding to raises → more callShift, less raiseShift
+//    (bots were: can't raise → fold, instead of: can't raise → call)
+// 2) Every hand has all-in → reduce raiseShift across board
+// 3) No slow-play/check-raise → trapper/nit need call not raise preflop
 const STYLE_DEVIATIONS: Record<SystemBotStyle, StyleDeviation> = {
-  gto:        { rangeScale: 1.0,  foldShift: 0,      raiseShift: +0.12,  callShift: -0.12 },
-  nit:        { rangeScale: 0.40, foldShift: +0.28,  raiseShift: -0.08,  callShift: -0.20 },
-  tag:        { rangeScale: 0.92, foldShift: +0.04,  raiseShift: +0.08,  callShift: -0.12 },
-  lag:        { rangeScale: 1.5,  foldShift: -0.25,  raiseShift: +0.30,  callShift: -0.05 },
-  station:    { rangeScale: 2.0,  foldShift: -0.60,  raiseShift: -0.25,  callShift: +0.85 },
-  maniac:     { rangeScale: 2.5,  foldShift: -0.50,  raiseShift: +0.55,  callShift: -0.05 },
-  trapper:    { rangeScale: 0.95, foldShift: 0,      raiseShift: -0.18,  callShift: +0.18 },
-  bully:      { rangeScale: 1.3,  foldShift: -0.15,  raiseShift: +0.20,  callShift: -0.05 },
-  tilter:     { rangeScale: 0.85, foldShift: +0.08,  raiseShift: 0,      callShift: -0.08 },
-  shortstack: { rangeScale: 0.75, foldShift: +0.08,  raiseShift: +0.22,  callShift: -0.30 },
-  adaptive:   { rangeScale: 1.10, foldShift: -0.08,  raiseShift: +0.10,  callShift: -0.02 },
+  gto:        { rangeScale: 1.2,  foldShift: -0.10,  raiseShift: +0.02,  callShift: +0.08 },
+  nit:        { rangeScale: 0.90, foldShift: -0.02,  raiseShift: -0.05,  callShift: +0.07 },
+  tag:        { rangeScale: 1.15, foldShift: -0.08,  raiseShift: +0.02,  callShift: +0.06 },
+  lag:        { rangeScale: 1.6,  foldShift: -0.25,  raiseShift: +0.12,  callShift: +0.13 },
+  station:    { rangeScale: 2.5,  foldShift: -0.65,  raiseShift: -0.25,  callShift: +0.90 },
+  maniac:     { rangeScale: 2.5,  foldShift: -0.45,  raiseShift: +0.30,  callShift: +0.15 },
+  trapper:    { rangeScale: 1.4,  foldShift: -0.15,  raiseShift: -0.15,  callShift: +0.30 },
+  bully:      { rangeScale: 1.4,  foldShift: -0.18,  raiseShift: +0.08,  callShift: +0.10 },
+  tilter:     { rangeScale: 1.2,  foldShift: -0.08,  raiseShift: +0.00,  callShift: +0.08 },
+  shortstack: { rangeScale: 1.1,  foldShift: -0.06,  raiseShift: +0.12,  callShift: -0.06 },
+  adaptive:   { rangeScale: 1.3,  foldShift: -0.12,  raiseShift: +0.04,  callShift: +0.08 },
 };
 
+// v3: wider defense — bots call raises more often to see flops
 const DEFENSE_PROFILES: Partial<Record<SystemBotStyle, DefenseProfile>> = {
-  nit:      { maxToCallBB: 2.5, foldToCall: 0.03, raiseToCall: 0.01 },
-  tag:      { maxToCallBB: 4.5, foldToCall: 0.08, raiseToCall: 0.04 },
-  trapper:  { maxToCallBB: 6.5, foldToCall: 0.14, raiseToCall: 0.12 },
-  shortstack:{ maxToCallBB: 2.5, foldToCall: 0.06, raiseToCall: 0.06 },
-  adaptive: { maxToCallBB: 5.0, foldToCall: 0.08, raiseToCall: 0.04 },
-  gto:      { maxToCallBB: 5.5, foldToCall: 0.11, raiseToCall: 0.04 },
+  nit:      { maxToCallBB: 4.0, foldToCall: 0.10, raiseToCall: 0.04 },
+  tag:      { maxToCallBB: 6.0, foldToCall: 0.14, raiseToCall: 0.08 },
+  trapper:  { maxToCallBB: 8.0, foldToCall: 0.20, raiseToCall: 0.15 },
+  bully:    { maxToCallBB: 6.0, foldToCall: 0.12, raiseToCall: 0.10 },
+  tilter:   { maxToCallBB: 5.0, foldToCall: 0.10, raiseToCall: 0.06 },
+  shortstack:{ maxToCallBB: 4.0, foldToCall: 0.10, raiseToCall: 0.10 },
+  adaptive: { maxToCallBB: 6.0, foldToCall: 0.14, raiseToCall: 0.08 },
+  gto:      { maxToCallBB: 6.5, foldToCall: 0.16, raiseToCall: 0.08 },
+  lag:      { maxToCallBB: 7.0, foldToCall: 0.16, raiseToCall: 0.12 },
+  station:  { maxToCallBB: 10.0, foldToCall: 0.25, raiseToCall: 0.05 },
+  maniac:   { maxToCallBB: 8.0, foldToCall: 0.15, raiseToCall: 0.15 },
 };
 
 // ─── Load CFR tables (graceful fallback) ─────────────────────────────────────
