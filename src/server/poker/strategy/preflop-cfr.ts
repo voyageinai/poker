@@ -84,6 +84,7 @@ const DEFENSE_PROFILES: Partial<Record<SystemBotStyle, DefenseProfile>> = {
   nit:      { maxToCallBB: 2.5, foldToCall: 0.03, raiseToCall: 0.01 },
   tag:      { maxToCallBB: 4.5, foldToCall: 0.08, raiseToCall: 0.04 },
   trapper:  { maxToCallBB: 6.5, foldToCall: 0.14, raiseToCall: 0.12 },
+  shortstack:{ maxToCallBB: 2.5, foldToCall: 0.06, raiseToCall: 0.06 },
   adaptive: { maxToCallBB: 5.0, foldToCall: 0.08, raiseToCall: 0.04 },
   gto:      { maxToCallBB: 5.5, foldToCall: 0.11, raiseToCall: 0.04 },
 };

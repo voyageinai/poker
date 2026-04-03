@@ -78,5 +78,5 @@ export function adjustForStackDepth(
 }
 
 export function shouldPushFold(stackBB: number): boolean {
-  return stackBB <= 15
+  return stackBB <= 14
 }

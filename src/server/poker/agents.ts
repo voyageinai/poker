@@ -17,7 +17,7 @@ import { getSystemBotByBinaryPath, type SystemBotDefinition, type SystemBotStyle
 // ─── New strategy modules (v2 upgrade) ─────────────────────────────────────
 import { analyzeBoard, type BoardTexture } from './strategy/board-texture';
 import { preflopHandStrength as preflopHandStrengthV2, getPreflopAction, type Position as PreflopPosition } from './strategy/preflop-ranges';
-import { adjustForStackDepth } from './strategy/stack-depth';
+import { adjustForStackDepth, classifyHand, shouldPushFold } from './strategy/stack-depth';
 import { postflopStrengthMC as postflopStrengthMCV2 } from './strategy/equity';
 import { chooseBalancedAction, type BalancedActionRequest } from './strategy/balanced-strategy';
 import { OpponentTracker } from './strategy/opponent-model';
@@ -324,7 +324,7 @@ const STYLE_CONFIG: Record<SystemBotStyle, StyleParams> = {
   trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.48, bluffRate: 0.03, raiseBias: 0.12, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.36, raiseShoveCommit: 0.78, callThresholdShift: -0.045, peelMargin: 0.12, peelRate: 0.34 },
   bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5, preflopCommitCap: 0.30, lowSprJamMax: 2.20, lowSprJamStrength: 0.38, committedJamStrength: 0.20, raiseShoveCommit: 0.50, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.16 },
   tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.25, lowSprJamMax: 2.10, lowSprJamStrength: 0.42, committedJamStrength: 0.22, raiseShoveCommit: 0.54, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.18 },
-  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.40, bluffRate: 0.05, raiseBias: 0.20, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25, lowSprJamMax: 3.00, lowSprJamStrength: 0.24, committedJamStrength: 0.10, raiseShoveCommit: 0.36, callThresholdShift: -0.01, peelMargin: 0.04, peelRate: 0.10 },
+  shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.44, bluffRate: 0.05, raiseBias: 0.22, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25, lowSprJamMax: 3.00, lowSprJamStrength: 0.24, committedJamStrength: 0.10, raiseShoveCommit: 0.36, callThresholdShift: -0.025, peelMargin: 0.06, peelRate: 0.14 },
   adaptive:   { label: '曹操',   aggression: 0.50, looseness: 0.45, bluffRate: 0.06, raiseBias: 0.20, crowdSensitivity: 0.5,  slowplayRate: 0.05, checkRaiseRate: 0.08, positionSensitivity: 0.8, sizingSensitivity: 0.8, patternSensitivity: 1.0, exploitWeight: 1.0, preflopCommitCap: 0.25, lowSprJamMax: 1.90, lowSprJamStrength: 0.50, committedJamStrength: 0.28, raiseShoveCommit: 0.64, callThresholdShift: -0.025, peelMargin: 0.08, peelRate: 0.22 },
   gto:        { label: '诸葛亮', aggression: 0.50, looseness: 0.42, bluffRate: 0.07, raiseBias: 0.22, crowdSensitivity: 0.5,  slowplayRate: 0.10, checkRaiseRate: 0.12, positionSensitivity: 0.9, sizingSensitivity: 0.9, patternSensitivity: 0.7, exploitWeight: 0.2, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.38, raiseShoveCommit: 0.72, callThresholdShift: -0.03, peelMargin: 0.09, peelRate: 0.24 },
 };
@@ -847,8 +847,8 @@ export class BuiltinBotAgent implements PlayerAgent {
     // ─── Shortstack (燕青): push/fold when ≤18BB ─────────────────────────
     if (style === 'shortstack') {
       const bbCount = req.stack / this.bigBlind;
-      if (bbCount <= 18 && req.street === 'preflop') {
-        const action = choosePushFold(this.holeCards, bbCount, req, this.players.length);
+      if (req.street === 'preflop' && shouldPushFold(bbCount)) {
+        const action = choosePushFold(this.holeCards, bbCount, req, this.players.length, this.myPosition);
         return this.finalizeBuiltinDecision({
           ...action,
           debug: {
@@ -1714,23 +1714,69 @@ function choosePushFold(
   bbCount: number,
   req: ActionRequest,
   playerCount: number,
+  position: Position,
 ): PokerAction {
   const strength = preflopStrength(holeCards);
+  const category = classifyHand(holeCards);
   // Push threshold depends on stack depth and number of players
   // Shorter stack = looser push range; more players = tighter
-  const positionFactor = Math.max(0, (6 - playerCount)) * 0.03;
-  const depthFactor = clamp01((20 - bbCount) / 20) * 0.15; // tighter at 15BB, looser at 5BB
-  const threshold = 0.48 - depthFactor - positionFactor;
+  const shortHandedBonus = Math.max(0, (6 - playerCount)) * 0.03;
+  const depthBonus = clamp01((14 - bbCount) / 14) * 0.14;
+  const latePositionBonus = position === 'BTN' || position === 'CO'
+    ? 0.05
+    : position === 'SB'
+      ? 0.07
+      : position === 'BB'
+        ? 0.03
+        : position === 'MP'
+          ? 0.02
+          : position === 'EP'
+            ? 0.01
+            : 0;
+  const blindDefenseBonus = req.toCall > 0
+    ? position === 'BB'
+      ? 0.08
+      : position === 'SB'
+        ? 0.03
+        : 0
+    : 0;
+
+  let categoryBonus = 0;
+  switch (category) {
+    case 'premium':
+      categoryBonus = 0.10;
+      break;
+    case 'small-pair':
+      categoryBonus = 0.08;
+      break;
+    case 'broadway':
+      categoryBonus = 0.07;
+      break;
+    case 'suited-connector':
+      categoryBonus = 0.07;
+      break;
+    case 'suited-gapper':
+      categoryBonus = 0.06;
+      break;
+    default:
+      categoryBonus = 0;
+      break;
+  }
+  if (req.toCall > 0 && position === 'BB' && bbCount <= 6 && (category === 'suited-connector' || category === 'suited-gapper')) {
+    categoryBonus += 0.04;
+  }
+
+  const threshold = 0.48 - depthBonus - shortHandedBonus;
 
   if (req.toCall > 0) {
-    // Facing a raise: need stronger hand to call all-in
-    const callThreshold = threshold + 0.08;
-    if (strength >= callThreshold) return { action: 'allin' };
+    const jamThreshold = threshold + 0.08 - latePositionBonus - blindDefenseBonus - categoryBonus;
+    if (strength >= jamThreshold) return { action: 'allin' };
     return { action: 'fold' };
   }
 
   // Open action: push or fold
-  if (strength >= threshold) return { action: 'allin' };
+  const openThreshold = threshold - latePositionBonus - categoryBonus * 0.75;
+  if (strength >= openThreshold) return { action: 'allin' };
   return req.toCall === 0 ? { action: 'check' } : { action: 'fold' };
 }
 
@@ -2017,3 +2063,4 @@ export function createBotAgent(
 
 export const STYLE_CONFIG_FOR_TEST = STYLE_CONFIG;
 export const chooseBuiltinActionForTest = chooseBuiltinAction;
+export const choosePushFoldForTest = choosePushFold;
