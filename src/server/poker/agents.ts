@@ -1368,6 +1368,14 @@ export class BuiltinBotAgent implements PlayerAgent {
         }
       }
 
+      // ── Pot-odds sanity floor ─────────────────────────────────────────
+      // When the price to call is trivial relative to the pot (e.g. a min-3bet
+      // after already flat-calling), folding is mathematically wrong with
+      // virtually any two cards.  potOdds < 0.12 ≈ getting better than 7:1.
+      if (preflopAction.action === 'fold' && potOdds > 0 && potOdds < 0.12) {
+        preflopAction = { action: 'call' };
+      }
+
       const preflopStrengthVal = preflopHandStrengthV2(this.holeCards, this.myPosition, effectiveStyle);
       return this.finalizeBuiltinDecision({
         ...preflopAction,

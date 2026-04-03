@@ -421,7 +421,10 @@ export function getPreflopActionCFR(
   //     station skips this entirely (calls anything).
   //     maniac: respects 3bet+ with a high bar (90%).
   //     others: strict threshold (40%).
-  if (actionSeq === 'facing_3bet' || actionSeq === 'facing_4bet' || actionSeq === 'facing_allin') {
+  //     SKIP when pot odds are trivially good (e.g. min-3bet after flat-calling):
+  //     folding 20 into 310+ pot is never correct regardless of hand strength.
+  const cheapToCall = context.potOdds !== undefined && context.potOdds < 0.12;
+  if (!cheapToCall && (actionSeq === 'facing_3bet' || actionSeq === 'facing_4bet' || actionSeq === 'facing_allin')) {
     // Station still folds against 4bet+ (even 猪八戒 isn't THAT loose)
     // Maniac folds some garbage against 3bet
     const foldBar = style === 'station' ? 0.70 : style === 'maniac' ? 0.80 : 0.40;

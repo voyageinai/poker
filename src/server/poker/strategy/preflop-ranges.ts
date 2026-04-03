@@ -241,13 +241,15 @@ export function getPreflopAction(
   let strength = preflopHandStrength(cards, position, style);
 
   // Context adjustments
-  // Facing a 3bet: tighten significantly
+  // Facing a 3bet: tighten significantly — but scale down when pot odds
+  // are trivially good (e.g. min-3bet after flat = toCall is tiny vs pot).
+  const cheapPotOdds = context.potOdds !== undefined && context.potOdds < 0.12;
   if (context.facing3Bet) {
-    strength -= 0.15;
+    strength -= cheapPotOdds ? 0.03 : 0.15;
   }
 
-  // Raisers ahead: tighten per raiser
-  strength -= context.raisersAhead * 0.06;
+  // Raisers ahead: tighten per raiser (reduced when price is trivial)
+  strength -= context.raisersAhead * (cheapPotOdds ? 0.02 : 0.06);
 
   // Short stack: reduce speculative hand value
   if (context.stackBB < 15 && isSpeculative(hand)) {
