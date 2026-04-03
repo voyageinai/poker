@@ -302,7 +302,7 @@ describe('preflopHandStrength', () => {
     expect(maniacPlays).toBeGreaterThan(nitPlays);
   });
 
-  it('tag opens KJo more readily from EP than from UTG', () => {
+  it('tag opens KJo from both UTG and EP (limp correction converts to raise)', () => {
     const utg = getPreflopAction(['Kh', 'Jd'], 'UTG', 'tag', {
       facing3Bet: false,
       raisersAhead: 0,
@@ -314,7 +314,8 @@ describe('preflopHandStrength', () => {
       stackBB: 100,
     });
 
-    expect(utg.action).toBe('call');
+    // After limp→raise correction, TAG raises KJo from both positions
+    expect(utg.action).toBe('raise');
     expect(ep.action).toBe('raise');
   });
 

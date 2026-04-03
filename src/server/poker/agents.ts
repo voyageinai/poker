@@ -321,7 +321,7 @@ const STYLE_CONFIG: Record<SystemBotStyle, StyleParams> = {
   lag:        { label: '孙悟空', aggression: 0.72, looseness: 0.65, bluffRate: 0.08, raiseBias: 0.28, crowdSensitivity: 0.4,  slowplayRate: 0,    checkRaiseRate: 0.08, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.7, preflopCommitCap: 0.35, lowSprJamMax: 2.10, lowSprJamStrength: 0.45, committedJamStrength: 0.24, raiseShoveCommit: 0.56, callThresholdShift: -0.015, peelMargin: 0.08, peelRate: 0.18 },
   station:    { label: '猪八戒', aggression: 0.16, looseness: 0.72, bluffRate: 0,    raiseBias: 0.04, crowdSensitivity: 0.15, slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.1, sizingSensitivity: 0.1, patternSensitivity: 0.1, exploitWeight: 0.1, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.58, committedJamStrength: 0.46, raiseShoveCommit: 0.82, callThresholdShift: -0.04, peelMargin: 0.12, peelRate: 0.30 },
   maniac:     { label: '张飞',   aggression: 0.88, looseness: 0.82, bluffRate: 0.18, raiseBias: 0.45, crowdSensitivity: 0.2,  slowplayRate: 0,    checkRaiseRate: 0.10, positionSensitivity: 0.1, sizingSensitivity: 0.2, patternSensitivity: 0.1, exploitWeight: 0.3, preflopCommitCap: 0.50, lowSprJamMax: 2.80, lowSprJamStrength: 0.30, committedJamStrength: 0.14, raiseShoveCommit: 0.42, callThresholdShift: -0.03, peelMargin: 0.10, peelRate: 0.22 },
-  trapper:    { label: '王熙凤', aggression: 0.38, looseness: 0.48, bluffRate: 0.03, raiseBias: 0.12, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.36, raiseShoveCommit: 0.78, callThresholdShift: -0.045, peelMargin: 0.12, peelRate: 0.34 },
+  trapper:    { label: '王熙凤', aggression: 0.42, looseness: 0.48, bluffRate: 0.03, raiseBias: 0.18, crowdSensitivity: 0.6,  slowplayRate: 0.55, checkRaiseRate: 0.40, positionSensitivity: 0.6, sizingSensitivity: 0.5, patternSensitivity: 0.8, exploitWeight: 0.6, preflopCommitCap: 0.25, lowSprJamMax: 1.50, lowSprJamStrength: 0.60, committedJamStrength: 0.36, raiseShoveCommit: 0.78, callThresholdShift: -0.045, peelMargin: 0.12, peelRate: 0.34 },
   bully:      { label: '鲁智深', aggression: 0.62, looseness: 0.55, bluffRate: 0.10, raiseBias: 0.30, crowdSensitivity: 0.5,  slowplayRate: 0,    checkRaiseRate: 0.06, positionSensitivity: 0.5, sizingSensitivity: 0.5, patternSensitivity: 0.4, exploitWeight: 0.5, preflopCommitCap: 0.30, lowSprJamMax: 2.20, lowSprJamStrength: 0.38, committedJamStrength: 0.20, raiseShoveCommit: 0.50, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.16 },
   tilter:     { label: '林冲',   aggression: 0.48, looseness: 0.38, bluffRate: 0.03, raiseBias: 0.15, crowdSensitivity: 0.7,  slowplayRate: 0,    checkRaiseRate: 0.04, positionSensitivity: 0.7, sizingSensitivity: 0.5, patternSensitivity: 0.5, exploitWeight: 0.5, preflopCommitCap: 0.25, lowSprJamMax: 2.10, lowSprJamStrength: 0.42, committedJamStrength: 0.22, raiseShoveCommit: 0.54, callThresholdShift: -0.02, peelMargin: 0.07, peelRate: 0.18 },
   shortstack: { label: '燕青',   aggression: 0.55, looseness: 0.44, bluffRate: 0.05, raiseBias: 0.22, crowdSensitivity: 0.6,  slowplayRate: 0,    checkRaiseRate: 0,    positionSensitivity: 0.4, sizingSensitivity: 0.5, patternSensitivity: 0.3, exploitWeight: 0.4, preflopCommitCap: 0.25, lowSprJamMax: 3.00, lowSprJamStrength: 0.24, committedJamStrength: 0.10, raiseShoveCommit: 0.36, callThresholdShift: -0.025, peelMargin: 0.06, peelRate: 0.14 },
@@ -777,10 +777,28 @@ export class BuiltinBotAgent implements PlayerAgent {
         } else {
           this.recentResults.push(-1); // lost (exact amount doesn't matter, just direction)
         }
-        if (this.recentResults.length > 8) this.recentResults.shift();
-        // Calculate tilt: count recent losses
-        const recentLosses = this.recentResults.slice(-5).filter(r => r < 0).length;
-        this.tiltLevel = clamp01(recentLosses / 5 * 1.2); // 3/5 losses = 0.72 tilt, 5/5 = 1.0
+        // Unified storage/calculation window (old code stored 8 but only used 5)
+        if (this.recentResults.length > 15) this.recentResults.shift();
+
+        // Step 1: rawTilt based on last 12 hands
+        const tiltWindow = this.recentResults.slice(-12);
+        const recentLosses = tiltWindow.filter(r => r < 0).length;
+        const rawTilt = clamp01(recentLosses / 12);
+
+        // Step 2: EMA mixing (smooth transition, not instant jumps)
+        let newTilt = this.tiltLevel * 0.7 + rawTilt * 0.3;
+
+        // Step 3: Natural cooling (-0.03 per hand, ~25 hands to fully recover)
+        newTilt = Math.max(0, newTilt - 0.03);
+
+        // Step 4: Big win reset (net win > 10BB cools down instantly)
+        // amount = newStack - oldStack in state-machine.ts, i.e. net chips won
+        if (myWin && myWin.amount > this.bigBlind * 10) {
+          newTilt = Math.max(0, newTilt - 0.25);
+        }
+
+        // Step 5: Cap at 0.75 (even full tilt ≠ complete maniac)
+        this.tiltLevel = clamp01(Math.min(newTilt, 0.75));
         break;
       }
       case 'showdown_result':
@@ -837,14 +855,14 @@ export class BuiltinBotAgent implements PlayerAgent {
     // ─── Tilter (林冲): tilt boosts aggression ───────────────────────────
     if (style === 'tilter' && this.tiltLevel > 0.2) {
       const t = this.tiltLevel;
-      cfg.aggression = clamp01(cfg.aggression + t * 0.40);
-      cfg.looseness = clamp01(cfg.looseness + t * 0.30);
-      cfg.bluffRate = clamp01(cfg.bluffRate + t * 0.15);
-      cfg.raiseBias = clamp01(cfg.raiseBias + t * 0.25);
+      cfg.aggression = clamp01(cfg.aggression + t * 0.28);
+      cfg.looseness = clamp01(cfg.looseness + t * 0.22);
+      cfg.bluffRate = clamp01(cfg.bluffRate + t * 0.10);
+      cfg.raiseBias = clamp01(cfg.raiseBias + t * 0.18);
       extraReasoning = ` 怒气值${Math.round(t * 100)}%, ${t > 0.6 ? '风雪山神庙!' : '渐失冷静.'}`;
     }
 
-    // ─── Shortstack (燕青): push/fold when ≤18BB ─────────────────────────
+    // ─── Shortstack (燕青): push/fold when ≤25BB ─────────────────────────
     if (style === 'shortstack') {
       const bbCount = req.stack / this.bigBlind;
       if (req.street === 'preflop' && shouldPushFold(bbCount)) {
@@ -1004,8 +1022,8 @@ export class BuiltinBotAgent implements PlayerAgent {
     // 林冲 (tilter): tilted → plays like 张飞 (maniac)
     // 鲁智深 (bully): chip advantage → plays like 孙悟空 (lag)
     let effectiveStyle: SystemBotStyle = personalityStyle;
-    if (style === 'tilter' && this.tiltLevel > 0.3) {
-      effectiveStyle = this.tiltLevel > 0.7 ? 'maniac' : 'lag';
+    if (style === 'tilter' && this.tiltLevel > 0.4) {
+      effectiveStyle = this.tiltLevel > 0.65 ? 'maniac' : 'lag';
       extraReasoning += this.tiltLevel > 0.7 ? ' 风雪山神庙!' : ' 渐失冷静.';
     }
     if (style === 'bully') {
@@ -1214,6 +1232,14 @@ export class BuiltinBotAgent implements PlayerAgent {
         patternPenalty = Math.min(patternPenalty, 0.15);
         adjustedStrength = clamp01(adjustedStrength - patternPenalty * cfg.patternSensitivity);
       }
+    }
+
+    // Spring the trap: trapper checked on a prior street → boost raise intent this street
+    if (style === 'trapper' && this.myActionsThisHand.some(
+      a => a.street !== req.street && a.action === 'check',
+    )) {
+      cfg.raiseBias = clamp01(cfg.raiseBias + 0.15);
+      cfg.checkRaiseRate = clamp01(cfg.checkRaiseRate + 0.10);
     }
 
     // Human pressure (final adjustment layer)
@@ -1583,10 +1609,15 @@ function chooseBuiltinAction(
   // Check-raise now has both value and bluff branches. Trappy styles can
   // spring with medium strength; aggressive styles can bluff-raise after checking.
   if (canRaise && lineContext.checkedThisStreet) {
+    // Trapper: lower check-raise floor to spring traps with medium-strength hands
+    const crFloor = style === 'trapper'
+      ? Math.max(0.32, Math.min(valueBetFloor, sizedCallThreshold + 0.05))
+      : Math.max(valueBetFloor, sizedCallThreshold);
+    const crStrengthRef = style === 'trapper' ? crFloor : valueBetFloor;
     const valueCheckRaiseFreq = clamp01(
-      cfg.checkRaiseRate * (0.25 + Math.max(0, strength - valueBetFloor + 0.10) * 1.20),
+      cfg.checkRaiseRate * (0.25 + Math.max(0, strength - crStrengthRef + 0.10) * 1.20),
     );
-    if (strength >= Math.max(valueBetFloor, sizedCallThreshold) && roll(valueCheckRaiseFreq)) {
+    if (strength >= crFloor && roll(valueCheckRaiseFreq)) {
       return chooseRaiseAction(req, strength, cfg, style, texture, 'value');
     }
 

@@ -476,22 +476,22 @@ describe('adaptive mirroring', () => {
 });
 
 describe('shortstack mode threshold', () => {
-  it('15BB shortstack no longer forces the hard push-fold branch', async () => {
+  it('26BB shortstack no longer forces the hard push-fold branch', async () => {
     const def = SYSTEM_BOTS.find(bot => bot.style === 'shortstack')!;
     const agent = new BuiltinBotAgent(def.userId, def);
 
     agent.notify({
       type: 'new_hand',
-      handId: 'shortstack-15bb',
+      handId: 'shortstack-26bb',
       seat: 0,
-      stack: 300,
+      stack: 520,
       players: [
-        { seat: 0, playerId: 'p0', displayName: 'P0', stack: 300, isBot: true },
-        { seat: 1, playerId: 'p1', displayName: 'P1', stack: 300, isBot: true },
-        { seat: 2, playerId: 'p2', displayName: 'P2', stack: 300, isBot: true },
-        { seat: 3, playerId: 'p3', displayName: 'P3', stack: 300, isBot: true },
-        { seat: 4, playerId: 'p4', displayName: 'P4', stack: 300, isBot: true },
-        { seat: 5, playerId: 'p5', displayName: 'P5', stack: 300, isBot: true },
+        { seat: 0, playerId: 'p0', displayName: 'P0', stack: 520, isBot: true },
+        { seat: 1, playerId: 'p1', displayName: 'P1', stack: 520, isBot: true },
+        { seat: 2, playerId: 'p2', displayName: 'P2', stack: 520, isBot: true },
+        { seat: 3, playerId: 'p3', displayName: 'P3', stack: 520, isBot: true },
+        { seat: 4, playerId: 'p4', displayName: 'P4', stack: 520, isBot: true },
+        { seat: 5, playerId: 'p5', displayName: 'P5', stack: 520, isBot: true },
       ],
       smallBlind: 10,
       bigBlind: 20,
@@ -506,7 +506,7 @@ describe('shortstack mode threshold', () => {
       currentBet: 20,
       toCall: 10,
       minRaise: 20,
-      stack: 300,
+      stack: 520,
       history: [],
     });
 

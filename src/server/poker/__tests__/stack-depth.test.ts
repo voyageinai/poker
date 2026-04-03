@@ -141,12 +141,12 @@ describe('shouldPushFold', () => {
     expect(shouldPushFold(10)).toBe(true)
   })
 
-  it('returns true at 14BB', () => {
-    expect(shouldPushFold(14)).toBe(true)
+  it('returns true at 25BB', () => {
+    expect(shouldPushFold(25)).toBe(true)
   })
 
-  it('returns false at 15BB', () => {
-    expect(shouldPushFold(15)).toBe(false)
+  it('returns false at 26BB', () => {
+    expect(shouldPushFold(26)).toBe(false)
   })
 
   it('returns false at 50BB', () => {

@@ -67,7 +67,7 @@ const RANK_ORDER = '23456789TJQKA';
 // 曹操 adaptive:  "观察弱点精准剥削" → 基线同GTO，靠 safe-exploit 系统偏移
 // 诸葛亮 gto:     "攻守完美平衡" → 零偏移
 const STYLE_DEVIATIONS: Record<SystemBotStyle, StyleDeviation> = {
-  gto:        { rangeScale: 1.0,  foldShift: 0,      raiseShift: 0,      callShift: 0 },
+  gto:        { rangeScale: 1.0,  foldShift: 0,      raiseShift: +0.12,  callShift: -0.12 },
   nit:        { rangeScale: 0.40, foldShift: +0.28,  raiseShift: -0.08,  callShift: -0.20 },
   tag:        { rangeScale: 0.92, foldShift: +0.04,  raiseShift: +0.08,  callShift: -0.12 },
   lag:        { rangeScale: 1.5,  foldShift: -0.25,  raiseShift: +0.30,  callShift: -0.05 },
@@ -350,6 +350,23 @@ export function getPreflopActionCFR(
   // 3. Apply style deviation
   let styled = applyStyleDeviation(gto, style);
   styled = applyDefenseBias(styled, style, position, actionSeq, context);
+
+  // ── Limp→raise correction for raise-first-in styles ──────────────────
+  // CFR tables include limps in the GTO equilibrium. For styles that should
+  // play raise-or-fold preflop, convert limp frequency to raise/fold.
+  // White-list ensures station/maniac/trapper limp behavior is preserved.
+  const LIMP_CORRECTION_STYLES: Set<SystemBotStyle> = new Set(['gto', 'tag', 'nit', 'shortstack']);
+  if (actionSeq === 'unopened' && position !== 'BB' && LIMP_CORRECTION_STYLES.has(style)) {
+    const limpToRaise = position === 'SB' ? 0.40 : 0.70;
+    const callFreq = styled.call;
+    if (callFreq > 0.01) {
+      styled.raise += callFreq * limpToRaise;
+      styled.fold += callFreq * (1 - limpToRaise);
+      styled.call = 0;
+      const total = styled.fold + styled.call + styled.raise;
+      if (total > 0) { styled.fold /= total; styled.call /= total; styled.raise /= total; }
+    }
+  }
 
   // 4. Select action from mixed strategy
   const result = selectAction(styled);

@@ -168,7 +168,7 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
       trigger: { streets: ['flop', 'turn', 'river'], facingAction: 'bet' },
       action: { type: 'raise', sizing: { mode: 'minraise' } },
       frequency: 0.62,
-      strengthGate: [0.62, 1.0],
+      strengthGate: [0.48, 1.0],
     },
     {
       name: 'check_call_then_raise',
@@ -179,7 +179,7 @@ const PLAYBOOKS: Record<SystemBotStyle, PlayPattern[]> = {
       },
       action: { type: 'raise', sizing: { mode: 'prev_bet_multiple', multiple: 2.5 } },
       frequency: 0.42,
-      strengthGate: [0.50, 1.0],
+      strengthGate: [0.38, 1.0],
     },
   ],
 
