@@ -401,16 +401,21 @@ export function getPreflopActionCFR(
     return { action: 'raise', frequency: 0.95 };
   }
 
-  // (b) Garbage override for FACING ACTION only.
-  //     For UNOPENED pots the style deviation system (rangeScale, foldShift, etc.)
-  //     already defines each style's opening range — selectAction() naturally folds
-  //     garbage for tight styles and opens wide for loose ones.  No override needed.
-  //     For FACING ACTION, use raw GTO fold frequency as a sanity cap so that even
-  //     LAG/maniac don't call raises with 72o.
-  if (actionSeq !== 'unopened') {
-    const garbageThreshold = style === 'station' ? 1.01  // station: never forced fold
-      : style === 'maniac' ? 0.965                        // maniac: fold the very worst garbage facing raises
-      : 0.96;                                              // others: standard
+  // (b) Garbage override: prevent style deviation raiseShift from inflating
+  //     true garbage hands into opens or calls.
+  //     selectAction() picks the dominant action, but frequency-based
+  //     randomization in agents.ts can still roll into the minority raise
+  //     bucket (e.g. shortstack raiseShift +0.12 gives 42o ~17% raise).
+  //     Use a stricter GTO fold threshold for unopened (only catch extreme
+  //     garbage), looser for facing action (standard sanity cap).
+  {
+    const isUnopened = actionSeq === 'unopened';
+    const garbageThreshold = isUnopened
+      // Unopened: only block hands GTO folds 97%+ (42o, 72o, etc.)
+      // Station/maniac get wider openings by design, exempt from this check.
+      ? (style === 'station' || style === 'maniac' ? 1.01 : 0.97)
+      // Facing action: existing thresholds
+      : (style === 'station' ? 1.01 : style === 'maniac' ? 0.965 : 0.96);
 
     if (gto.fold > garbageThreshold && result.action !== 'fold') {
       return { action: 'fold', frequency: gto.fold };
@@ -421,10 +426,10 @@ export function getPreflopActionCFR(
   //     station skips this entirely (calls anything).
   //     maniac: respects 3bet+ with a high bar (90%).
   //     others: strict threshold (40%).
-  //     SKIP when pot odds are trivially good (e.g. min-3bet after flat-calling):
-  //     folding 20 into 310+ pot is never correct regardless of hand strength.
-  const cheapToCall = context.potOdds !== undefined && context.potOdds < 0.12;
-  if (!cheapToCall && (actionSeq === 'facing_3bet' || actionSeq === 'facing_4bet' || actionSeq === 'facing_allin')) {
+  //     NOTE: Always enforce this check even when pot odds are trivial.
+  //     The agents.ts pot-odds floor handles fold→call conversion separately;
+  //     skipping this check lets style raiseShift inflate garbage (e.g. 42o 4-bet).
+  if (actionSeq === 'facing_3bet' || actionSeq === 'facing_4bet' || actionSeq === 'facing_allin') {
     // Station still folds against 4bet+ (even 猪八戒 isn't THAT loose)
     // Maniac folds some garbage against 3bet
     const foldBar = style === 'station' ? 0.70 : style === 'maniac' ? 0.80 : 0.40;
