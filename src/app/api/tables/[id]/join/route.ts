@@ -18,14 +18,6 @@ export async function POST(
   if (!table) return NextResponse.json({ error: 'Table not found' }, { status: 404 });
 
   const body = await req.json() as { buyin?: number; seatIndex?: number };
-  const buyin = body.buyin ?? table.min_buyin;
-
-  if (buyin < table.min_buyin || buyin > table.max_buyin) {
-    return NextResponse.json(
-      { error: `Buy-in must be between ${table.min_buyin} and ${table.max_buyin}` },
-      { status: 400 },
-    );
-  }
 
   const dbUser = getUserById(user.userId);
   if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -40,6 +32,15 @@ export async function POST(
   }
 
   if (dbUser.banned) return NextResponse.json({ error: '账号已被封禁' }, { status: 403 });
+
+  const buyin = body.buyin ?? table.min_buyin;
+
+  if (buyin < table.min_buyin || buyin > table.max_buyin) {
+    return NextResponse.json(
+      { error: `买入必须在 ${table.min_buyin} 到 ${table.max_buyin} 之间` },
+      { status: 400 },
+    );
+  }
   if (dbUser.chips < buyin) return NextResponse.json({ error: '筹码不足' }, { status: 400 });
 
   const mgr = getOrCreateTableManager(tableId);
