@@ -371,6 +371,11 @@ function af(raises: number, calls: number): number {
 async function main() {
   const hands = Number.parseInt(process.env.PROFILE_HANDS ?? '300', 10);
   const tableFilter = process.env.PROFILE_TABLE ?? 'all';
+  const customStyles = process.env.PROFILE_STYLES
+    ?.split(',')
+    .map(s => s.trim())
+    .filter(Boolean) as SystemBotStyle[] | undefined;
+  const customLabel = process.env.PROFILE_LABEL?.trim() || 'Custom';
   const mode = process.env.PROFILE_MODE === 'persistent' ? 'persistent' : 'reset';
   const autoRebuy = process.env.PROFILE_AUTO_REBUY !== '0';
   const stackMode = process.env.PROFILE_STACK_MODE === 'uniform' ? 'uniform' : 'system';
@@ -378,6 +383,10 @@ async function main() {
     { name: 'Table-A', styles: ['nit', 'tag', 'lag', 'station', 'maniac', 'trapper'] },
     { name: 'Table-B', styles: ['bully', 'tilter', 'shortstack', 'adaptive', 'gto', 'tag'] },
   ];
+
+  if (customStyles && customStyles.length > 0) {
+    lineups.unshift({ name: customLabel, styles: customStyles });
+  }
 
   const selected = tableFilter === 'all'
     ? lineups
